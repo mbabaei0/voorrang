@@ -1,0 +1,3 @@
+# Vanilla three.js scene inside a SvelteKit shell
+
+The 3D scene is a framework-free three.js module built imperatively from Scenario data, while the UI shell (menus, progress, i18n, accessibility) is SvelteKit with static prerendering. The stack research showed the 3D code is the same three.js in every wrapper, so the real drivers were phone JS weight (vanilla ~155 KB gz vs R3F ~320 KB), R3F's v9→v10 break, and needing a real framework for the accessible, translated UI. Threlte was the close alternative; we kept the scene wrapper-free so it can be tested and swapped independently of the UI framework.

@@ -1,0 +1,3 @@
+# Authored answers, validated by a rules engine
+
+Each Scenario's Passing order is written by an author and checked at build time by a rules engine that applies the RVV precedence; a disagreement fails the build unless the author overrides it by citing a Rule of kind *convention* with its source. We rejected hand-authoring alone (subtle RVV mistakes like art. 18 cyclists would ship silently) and full derivation (the engine would have to cover every topic before any content exists, and CBR conventions such as "the one leaving the uitrit goes first" are not law). The one exception is Deadlocks, where the engine derives the order after the learner's waiver, since no authored order exists.
