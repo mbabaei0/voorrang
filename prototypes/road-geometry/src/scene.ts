@@ -331,6 +331,14 @@ const mergedMesh = (parts: BufferGeometry[], name: string) => {
 const roadUserMaterials = new Map<RoadUserKind, MeshLambertMaterial>();
 
 /** A placeholder box for a road user, waiting just before its stop line, facing along its path. */
+export const roadUserLength = (kind: RoadUserKind) => ROAD_USERS[kind].size[2];
+export const roadUserHeight = (kind: RoadUserKind) => ROAD_USERS[kind].size[1];
+export const roadUserColour = (kind: RoadUserKind) => ROAD_USERS[kind].colour;
+
+/** How far along its path a road user stands while it waits: just behind the stop line, or at the kerb. */
+export const waitingDistance = (layout: Layout, user: RoadUser) =>
+  user.manoeuvre === 'cross' ? 0 : Math.max(0, ARM_LENGTH - stopLineDistance(layout) - roadUserLength(user.kind) / 2 - 0.5);
+
 const roadUserMesh = (layout: Layout, user: RoadUser) => {
   const { size, colour } = ROAD_USERS[user.kind];
   const [width, height, length] = size;
@@ -341,8 +349,7 @@ const roadUserMesh = (layout: Layout, user: RoadUser) => {
   mesh.userData.roadUserId = user.id;
 
   const path = manoeuvrePath(layout, user);
-  const waitAt = user.manoeuvre === 'cross' ? 0 : ARM_LENGTH - stopLineDistance(layout) - length / 2 - 0.5;
-  const u = Math.max(0, waitAt / path.getLength());
+  const u = waitingDistance(layout, user) / path.getLength();
   const position = path.getPointAt(u);
   mesh.position.set(position.x, height / 2, position.z);
   mesh.lookAt(mesh.position.clone().add(path.getTangentAt(u)));

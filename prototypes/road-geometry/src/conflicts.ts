@@ -7,6 +7,9 @@ export type Conflict = {
   b: string;
   kind: 'cross' | 'merge';
   at: Vector3;
+  /** How far along a's and b's paths the conflict point lies, in metres. */
+  alongA: number;
+  alongB: number;
 };
 
 /** Paths closer than this are treated as touching. */
@@ -49,6 +52,10 @@ const crossing = (p: Vector3, p2: Vector3, q: Vector3, q2: Vector3): Vector3 | n
   return t >= 0 && t <= 1 && u >= 0 && u <= 1 ? p.clone().addScaledVector(d, t) : null;
 };
 
+/** Distance along an evenly sampled polyline to a point on one of its segments. */
+const alongLine = (line: Vector3[], segment: number, point: Vector3) =>
+  segment * line[0]!.distanceTo(line[1]!) + line[segment]!.distanceTo(point);
+
 const heading = (line: Vector3[], segment: number) => line[segment + 1]!.clone().sub(line[segment]!).normalize();
 
 /**
@@ -65,14 +72,15 @@ const meeting = (a: Vector3[], b: Vector3[]): Omit<Conflict, 'a' | 'b'> | null =
     }
     if (!apart) continue;
     const angle = heading(a, Math.min(i, a.length - 2)).angleTo(heading(b, near.segment));
-    if (angle < MERGE_ANGLE) return { kind: 'merge', at: near.point };
+    const touching = { at: near.point, alongA: alongLine(a, i, a[i]!), alongB: alongLine(b, near.segment, near.point) };
+    if (angle < MERGE_ANGLE) return { kind: 'merge', ...touching };
     for (let j = Math.max(0, near.segment - 2); j < Math.min(b.length - 1, near.segment + 3); j++) {
       for (let k = Math.max(0, i - 2); k < Math.min(a.length - 1, i + 3); k++) {
         const at = crossing(a[k]!, a[k + 1]!, b[j]!, b[j + 1]!);
-        if (at) return { kind: 'cross', at };
+        if (at) return { kind: 'cross', at, alongA: alongLine(a, k, at), alongB: alongLine(b, j, at) };
       }
     }
-    return { kind: 'cross', at: near.point };
+    return { kind: 'cross', ...touching };
   }
   return null;
 };
