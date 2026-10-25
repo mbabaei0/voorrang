@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Road geometry prototype</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #dfe7ec; font: 14px/1.4 system-ui, sans-serif; }
+      canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+      #hud { position: fixed; top: 8px; left: 8px; right: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+        background: rgb(255 255 255 / 0.9); padding: 8px; border-radius: 8px; max-width: 640px; }
+      #stats { font-variant-numeric: tabular-nums; }
+    </style>
+  </head>
+  <body>
+    <div id="hud">
+      <select id="layout"></select>
+      <label><input type="checkbox" id="paths" checked /> paths</label>
+      <label><input type="checkbox" id="conflicts" checked /> conflicts</label>
+      <span id="stats"></span>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
