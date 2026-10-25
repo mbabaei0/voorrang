@@ -41,10 +41,10 @@ describe('scheduleReplay, more', () => {
     }
   });
 
-  it('ends as soon as the last road user has cleared the junction, not when it reaches the edge of the map', () => {
+  it('ends as soon as the last road user has cleared the junction, not when it reaches the end of its arm', () => {
     const replay = scheduleReplay(crossroads, roadUsers, [['bike', 'ped'], ['car']]);
     // The junction ends 8 m out (3.5 m lane, 3 m to the far side of the cycle path, 1.5 m margin); the crossing
-    // band runs to 11 m and the stop line is at 11.5 m. The car is past that, well short of the map edge at 30 m.
+    // band runs to 11 m and the stop line is at 11.5 m. The car is past that, well short of the end of the arm at 30 m.
     const car = replay.pose('car', replay.duration).position;
     expect(car.x).toBeGreaterThan(13);
     expect(car.x).toBeLessThan(25);

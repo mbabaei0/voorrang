@@ -330,7 +330,6 @@ const mergedMesh = (parts: BufferGeometry[], name: string) => {
 
 const roadUserMaterials = new Map<RoadUserKind, MeshLambertMaterial>();
 
-/** A placeholder box for a road user, waiting just before its stop line, facing along its path. */
 export const roadUserLength = (kind: RoadUserKind) => ROAD_USERS[kind].size[2];
 export const roadUserHeight = (kind: RoadUserKind) => ROAD_USERS[kind].size[1];
 export const roadUserColour = (kind: RoadUserKind) => ROAD_USERS[kind].colour;
@@ -339,6 +338,7 @@ export const roadUserColour = (kind: RoadUserKind) => ROAD_USERS[kind].colour;
 export const waitingDistance = (layout: Layout, user: RoadUser) =>
   user.manoeuvre === 'cross' ? 0 : Math.max(0, ARM_LENGTH - stopLineDistance(layout) - roadUserLength(user.kind) / 2 - 0.5);
 
+/** A placeholder box for a road user, waiting just before its stop line, facing along its path. */
 const roadUserMesh = (layout: Layout, user: RoadUser) => {
   const { size, colour } = ROAD_USERS[user.kind];
   const [width, height, length] = size;

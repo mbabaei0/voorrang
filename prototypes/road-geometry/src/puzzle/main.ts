@@ -17,10 +17,11 @@ import {
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
+import { conflicts } from '../conflicts';
 import { manoeuvrePath, type RoadUserKind } from '../layout';
 import { buildScene, roadUserColour, roadUserHeight, roadUserLength, waitingDistance } from '../scene';
 import { emptyAnswer, fromSteps, move, score, steps, tap, toggleLink, type Answer, type Score } from './answer';
-import { scheduleReplay, type Replay } from './replay';
+import { scheduleReplay, type Replay, type WrongAnswer } from './replay';
 import { scenarios, type Scenario } from './scenarios';
 
 const KIND_LABEL: Record<RoadUserKind, string> = {
@@ -83,6 +84,11 @@ const meshes = new Map<string, Mesh>();
 const badges = new Map<string, CSS2DObject>();
 const proxies: Object3D[] = [];
 let crashMarker: Mesh | null = null;
+/** Pairs of road users whose paths meet, as "a|b" both ways: only they have to wait for each other. */
+let meeting = new Set<string>();
+const meet = (a: string, b: string) => meeting.has(`${a}|${b}`);
+const proxyMaterial = new MeshBasicMaterial();
+const crashMaterial = new MeshBasicMaterial({ color: 0xcf222e });
 
 const user = (id: string) => scenario.roadUsers.find((u) => u.id === id)!;
 const label = (id: string) => {
@@ -109,11 +115,12 @@ const loadScenario = (next: Scenario) => {
   crashMarker = null;
 
   world = buildScene(scenario.layout, scenario.roadUsers);
+  meeting = new Set(conflicts(scenario.layout, scenario.roadUsers).flatMap((c) => [`${c.a}|${c.b}`, `${c.b}|${c.a}`]));
   for (const u of scenario.roadUsers) {
     const mesh = world.getObjectByName(`roadUser:${u.id}`) as Mesh;
     meshes.set(u.id, mesh);
     // A generous invisible box to tap, so small cyclists and pedestrians are easy to hit on a phone.
-    const proxy = new Mesh(new BoxGeometry(2.5, roadUserHeight(u.kind) + 1, Math.max(3, roadUserLength(u.kind))));
+    const proxy = new Mesh(new BoxGeometry(2.5, roadUserHeight(u.kind) + 1, Math.max(3, roadUserLength(u.kind))), proxyMaterial);
     proxy.visible = false;
     proxy.userData.roadUserId = u.id;
     mesh.add(proxy);
@@ -218,7 +225,7 @@ const renderTray = (stepIndex: Map<string, number>) => {
   }
 };
 
-/** Drag a placed chip sideways to a new position in the order. */
+/** Drag a placed chip to a new position in the order; the tray may wrap onto several lines. */
 let dragged = false;
 const enableDrag = (el: HTMLElement, from: number) => {
   el.addEventListener('pointerdown', (down) => {
@@ -231,18 +238,30 @@ const enableDrag = (el: HTMLElement, from: number) => {
         el.style.transform = `translate(${e.clientX - down.clientX}px, ${e.clientY - down.clientY}px)`;
       }
     };
-    const onUp = (e: PointerEvent) => {
+    const end = (e: PointerEvent) => {
       el.removeEventListener('pointermove', onMove);
-      el.removeEventListener('pointerup', onUp);
+      el.removeEventListener('pointerup', end);
+      el.removeEventListener('pointercancel', end);
       if (!dragged) return;
-      const others = [...tray.querySelectorAll<HTMLElement>('.chip.placed')];
-      const to = others.filter((o) => o !== el && o.getBoundingClientRect().left + o.offsetWidth / 2 < e.clientX).length;
+      if (e.type === 'pointercancel') {
+        update();
+        dragged = false;
+        return;
+      }
+      // Count the chips that come before the drop point in reading order: earlier lines, then left on this line.
+      const others = [...tray.querySelectorAll<HTMLElement>('.chip.placed')].filter((o) => o !== el);
+      const to = others.filter((o) => {
+        const r = o.getBoundingClientRect();
+        const sameLine = Math.abs(r.top + r.height / 2 - e.clientY) <= r.height / 2;
+        return r.bottom < e.clientY - r.height / 2 || (sameLine && r.left + r.width / 2 < e.clientX);
+      }).length;
       answer = move(answer, from, to);
       update();
       setTimeout(() => (dragged = false));
     };
     el.addEventListener('pointermove', onMove);
-    el.addEventListener('pointerup', onUp);
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
   });
 };
 
@@ -284,9 +303,19 @@ const presetPose = (preset: Preset): { position: Vector3; target: Vector3 } => {
   return { position: at.clone().add(back).setY(11), target: new Vector3(0, 0, 0) };
 };
 
+const pressCameraButton = (preset: Preset | null) => {
+  for (const b of document.querySelectorAll<HTMLButtonElement>('[data-camera]')) b.setAttribute('aria-pressed', String(b.dataset.camera === preset));
+};
+
+/** Glide the camera to a pose. */
+const glideTo = (position: Vector3, target: Vector3) => {
+  tween = { from: camera.position.clone(), to: position, fromTarget: controls.target.clone(), toTarget: target, start: performance.now() };
+  loop();
+};
+
 const setCamera = (preset: Preset, animate = true) => {
   cameraPreset = preset;
-  for (const b of document.querySelectorAll<HTMLButtonElement>('[data-camera]')) b.setAttribute('aria-pressed', String(b.dataset.camera === preset));
+  pressCameraButton(preset);
   const pose = presetPose(preset);
   if (!animate) {
     camera.position.copy(pose.position);
@@ -294,24 +323,25 @@ const setCamera = (preset: Preset, animate = true) => {
     controls.update();
     return;
   }
-  tween = { from: camera.position.clone(), to: pose.position, fromTarget: controls.target.clone(), toTarget: pose.target, start: performance.now() };
-  loop();
+  glideTo(pose.position, pose.target);
 };
 
 // ---- Replay. ----
 
 let replay: Replay | null = null;
 let clock = 0;
-let last = 0;
+let last: number | null = null;
 const frameTimes: number[] = [];
 
-const playReplay = (order: string[][], wrong?: { tooEarly: string; waitedFor: string[] }) => {
+const playReplay = (order: string[][], wrong?: WrongAnswer) => {
   replay = scheduleReplay(scenario.layout, scenario.roadUsers, order, wrong);
-  if (crashMarker) world.remove(crashMarker);
+  if (crashMarker) {
+    world.remove(crashMarker);
+    crashMarker.geometry.dispose();
+  }
   crashMarker = null;
   phase = 'replaying';
   clock = 0;
-  last = performance.now();
   frameTimes.length = 0;
   feedback.hidden = true;
   update();
@@ -329,13 +359,12 @@ const placeRoadUsers = (t: number) => {
 
 const showCrash = () => {
   const c = replay!.collision!;
-  crashMarker = new Mesh(new RingGeometry(2.2, 3, 40).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0xcf222e }));
+  crashMarker = new Mesh(new RingGeometry(2.2, 3, 40).rotateX(-Math.PI / 2), crashMaterial);
   crashMarker.position.copy(c.at).setY(0.12);
   world.add(crashMarker);
   // Move in on the conflict, keeping the current viewing direction, so it reads on a small screen.
   const offset = camera.position.clone().sub(controls.target).setLength(22);
-  tween = { from: camera.position.clone(), to: c.at.clone().add(offset), fromTarget: controls.target.clone(), toTarget: c.at.clone(), start: performance.now() };
-  loop();
+  glideTo(c.at.clone().add(offset), c.at.clone());
 };
 
 const finishReplay = () => {
@@ -371,13 +400,14 @@ let looping = false;
 const loop = () => {
   if (looping) return;
   looping = true;
-  last = performance.now();
+  last = null;
   requestAnimationFrame(frame);
 };
 
 const frame = (now: number) => {
-  const dt = Math.min(0.1, (now - last) / 1000);
-  frameTimes.push(now - last);
+  // The first frame of a run has no previous frame to measure from.
+  const dt = last === null ? 0 : Math.min(0.1, (now - last) / 1000);
+  if (last !== null && phase === 'replaying') frameTimes.push(now - last);
   last = now;
   let busy = false;
 
@@ -425,7 +455,7 @@ const render = () => {
 
 checkButton.onclick = () => {
   if (phase === 'answering') {
-    result = score(answer, scenario.passingOrder);
+    result = score(answer, scenario.passingOrder, meet);
     if (result.verdict === 'incomplete') return;
     playReplay(steps(answer), result.verdict === 'wrong' ? result : undefined);
   } else if (result?.verdict === 'correct') {
@@ -456,11 +486,12 @@ settings.onchange = () => {
   if (!tiesAllowed()) answer = { ...answer, linked: answer.linked.map(() => false) };
   update();
 };
-controls.addEventListener('change', () => {
+// Only the learner orbiting leaves the preset; programmatic moves also fire 'change'.
+controls.addEventListener('start', () => {
   cameraPreset = null;
-  for (const b of document.querySelectorAll<HTMLButtonElement>('[data-camera]')) b.setAttribute('aria-pressed', 'false');
-  render();
+  pressCameraButton(null);
 });
+controls.addEventListener('change', render);
 addEventListener('resize', render);
 
 // Variants can be preselected from the URL, e.g. ?input=tray&ties=strict&speed=2&orbit=on, to share a test setup.

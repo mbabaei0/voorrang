@@ -69,3 +69,20 @@ describe('scoring an answer against the Passing order', () => {
     expect(score(build('bike', 'ped'), passingOrder)).toEqual({ verdict: 'incomplete', missing: ['car'] });
   });
 });
+
+describe('scoring when some road users never meet', () => {
+  // Car from the south and a moped turning right from the north may go together; the bus from the west waits
+  // for the car, which comes from its right. The bus and the moped never meet.
+  const passingOrder = [['car', 'moped'], ['bus']];
+  const meet = (a: string, b: string) => [a, b].sort().join() !== 'bus,moped';
+  const build = (...ids: string[]) => ids.reduce(tap, emptyAnswer);
+
+  it('does not require an order between road users whose paths never meet', () => {
+    expect(score(build('car', 'bus', 'moped'), passingOrder, meet)).toEqual({ verdict: 'correct' });
+    expect(score(build('moped', 'car', 'bus'), passingOrder, meet)).toEqual({ verdict: 'correct' });
+  });
+
+  it('still names only the road users it actually had to wait for', () => {
+    expect(score(build('bus', 'moped', 'car'), passingOrder, meet)).toEqual({ verdict: 'wrong', tooEarly: 'bus', waitedFor: ['car'] });
+  });
+});

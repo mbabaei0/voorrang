@@ -38,13 +38,13 @@ export const scenarios: Scenario[] = [
     layout: { kind: 'crossroads', arms: compass() },
     roadUsers: [
       { id: 'blue', kind: 'car', arm: 's', manoeuvre: 'straight' },
-      { id: 'van', kind: 'bus', arm: 'w', manoeuvre: 'straight' },
+      { id: 'bus', kind: 'bus', arm: 'w', manoeuvre: 'straight' },
       { id: 'moped', kind: 'moped', arm: 'n', manoeuvre: 'right' },
     ],
-    you: 'van',
-    passingOrder: [['blue', 'moped'], ['van']],
+    you: 'bus',
+    passingOrder: [['blue', 'moped'], ['bus']],
     explanations: {
-      van: 'The car from the south comes from your right, so it goes first (RVV art. 15). The moped turning right never crosses your path.',
+      bus: 'The car from the south comes from your right, so it goes first (RVV art. 15). The moped turning right never crosses your path.',
     },
   },
   {
@@ -66,8 +66,8 @@ export const scenarios: Scenario[] = [
     you: 'car',
     passingOrder: [['ambulance'], ['tram'], ['car']],
     explanations: {
-      tram: 'An emergency vehicle with blue lights and siren goes before everyone, the tram included.',
-      car: 'You stop at the STOP sign (B7) and give way to all traffic on the main road, the tram included (RVV art. 80).',
+      tram: 'An emergency vehicle using blue lights and siren goes before everyone, the tram included (RVV art. 50).',
+      car: 'You wait for the ambulance (RVV art. 50), then stop at the STOP sign (B7) and give way to all traffic on the main road, the tram included (RVV art. 62, Bijlage 1).',
     },
   },
   {

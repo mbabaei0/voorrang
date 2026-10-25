@@ -68,9 +68,10 @@ export type Score =
 
 /**
  * Any order within a Step of the Passing order is right, whether the learner numbers them one by one (as CBR
- * does) or links them. A link is right only between road users who may really go together.
+ * does) or links them. A link is right only between road users who may really go together. With `meet`, a road
+ * user only has to wait for earlier road users whose paths meet its own; without it, for every earlier Step.
  */
-export const score = (answer: Answer, passingOrder: string[][]): Score => {
+export const score = (answer: Answer, passingOrder: string[][], meet: (a: string, b: string) => boolean = () => true): Score => {
   const stepOf = new Map(passingOrder.flatMap((step, i) => step.map((id) => [id, i] as const)));
   const missing = [...stepOf.keys()].filter((id) => !answer.order.includes(id));
   if (missing.length) return { verdict: 'incomplete', missing };
@@ -78,7 +79,9 @@ export const score = (answer: Answer, passingOrder: string[][]): Score => {
   const gone = new Set<string>();
   for (const step of steps(answer)) {
     for (const id of step) {
-      const waitedFor = [...stepOf].filter(([other, i]) => i < stepOf.get(id)! && !gone.has(other)).map(([other]) => other);
+      const waitedFor = [...stepOf]
+        .filter(([other, i]) => i < stepOf.get(id)! && !gone.has(other) && meet(id, other))
+        .map(([other]) => other);
       if (waitedFor.length) return { verdict: 'wrong', tooEarly: id, waitedFor };
     }
     step.forEach((id) => gone.add(id));

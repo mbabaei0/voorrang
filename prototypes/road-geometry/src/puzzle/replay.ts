@@ -2,6 +2,9 @@ import { Vector3 } from 'three';
 import { conflicts, type Conflict } from '../conflicts';
 import { ARM_LENGTH, manoeuvrePath, stopLineDistance, type Layout, type Path, type RoadUser, type RoadUserKind } from '../layout';
 import { roadUserLength, waitingDistance } from '../scene';
+import type { Score } from './answer';
+
+export type WrongAnswer = Extract<Score, { verdict: 'wrong' }>;
 
 /** Replay speeds in m/s: brisk enough to watch, in the right proportion to each other. */
 const SPEED: Record<RoadUserKind, number> = {
@@ -53,7 +56,7 @@ export const scheduleReplay = (
   layout: Layout,
   roadUsers: RoadUser[],
   steps: string[][],
-  wrong?: { tooEarly: string; waitedFor: string[] },
+  wrong?: Pick<WrongAnswer, 'tooEarly' | 'waitedFor'>,
 ): Replay => {
   const byId = new Map(roadUsers.map((user) => [user.id, user]));
   const tracks = new Map<string, Track>();
