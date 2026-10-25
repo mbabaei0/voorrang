@@ -15,12 +15,9 @@ const SAMPLE_SPACING = 0.2;
 /** Paths meeting at less than this angle merge rather than cross. */
 const MERGE_ANGLE = Math.PI / 6;
 
-type Sampled = { points: Vector3[] };
-
-const sample = (layout: Layout, user: RoadUser): Sampled => {
+const sample = (layout: Layout, user: RoadUser): Vector3[] => {
   const path = manoeuvrePath(layout, user);
-  const n = Math.max(2, Math.ceil(path.getLength() / SAMPLE_SPACING));
-  return { points: path.getSpacedPoints(n) };
+  return path.getSpacedPoints(Math.max(2, Math.ceil(path.getLength() / SAMPLE_SPACING)));
 };
 
 const closestOnSegment = (p: Vector3, a: Vector3, b: Vector3) => {
@@ -86,7 +83,7 @@ export const conflicts = (layout: Layout, users: RoadUser[]): Conflict[] => {
   const found: Conflict[] = [];
   for (let i = 0; i < users.length; i++) {
     for (let j = i + 1; j < users.length; j++) {
-      const met = meeting(sampled[i]!.points, sampled[j]!.points);
+      const met = meeting(sampled[i]!, sampled[j]!);
       if (met) found.push({ a: users[i]!.id, b: users[j]!.id, ...met });
     }
   }

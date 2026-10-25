@@ -37,7 +37,10 @@ import {
   junctionEdge,
   junctionRadius,
   stopLineDistance,
-  surfaceEdge,
+  halfWidth,
+  inEdge,
+  outEdge,
+  FOOTWAY_OFFSET,
   type Arm,
   type Layout,
   type LightState,
@@ -130,6 +133,8 @@ const dashes = (arm: Arm, from: number, side: number, out: BufferGeometry[]) => 
 
 // ---- Pieces of the Layout. ----
 
+const FOOTWAY_WIDTH = 2;
+
 const carriageway = (arm: Arm): [number, number] => [-lanesOut(arm) * LANE_WIDTH, lanesIn(arm) * LANE_WIDTH];
 
 const mainRoad = (layout: Layout) => layout.arms.filter((arm) => !arm.exit);
@@ -148,7 +153,7 @@ const armStart = (layout: Layout, arm: Arm) => {
 /** Where an arm's footways begin: outside a roundabout's rings, or outside the main road's footways at an uitrit. */
 const footwayStart = (layout: Layout, arm: Arm) => {
   if (layout.kind === 'roundabout') return junctionEdge(layout);
-  if (arm.exit) return Math.max(...mainRoad(layout).map((main) => surfaceEdge(main, Math.max(lanesIn(main), lanesOut(main))) + 2.5));
+  if (arm.exit) return Math.max(...mainRoad(layout).map((main) => halfWidth(main) + FOOTWAY_OFFSET + FOOTWAY_WIDTH / 2));
   return armStart(layout, arm);
 };
 
@@ -157,8 +162,8 @@ const armSurface = (layout: Layout, arm: Arm, out: BufferGeometry[]) => {
   const colour = arm.exit ? COLOURS.brick : arm.surface === 'unpaved' ? COLOURS.unpaved : COLOURS.asphalt;
   out.push(strip(arm, [start, ARM_LENGTH], carriageway(arm), LAYER.road, colour));
 
-  const inEdge = surfaceEdge(arm, lanesIn(arm));
-  const outEdge = surfaceEdge(arm, lanesOut(arm));
+  const rightEdge = inEdge(arm);
+  const leftEdge = outEdge(arm);
   if (arm.cyclePath) {
     const cycleStart = layout.kind === 'roundabout' ? CYCLE_RING_RADIUS : start;
     const inner = VERGE_WIDTH;
@@ -167,8 +172,10 @@ const armSurface = (layout: Layout, arm: Arm, out: BufferGeometry[]) => {
     out.push(strip(arm, [cycleStart, ARM_LENGTH], [left - inner - CYCLE_PATH_WIDTH, left - inner], LAYER.cyclePath, COLOURS.cyclePath));
   }
   const footStart = footwayStart(layout, arm);
-  out.push(strip(arm, [footStart, ARM_LENGTH], [inEdge + 0.5, inEdge + 2.5], LAYER.footway, COLOURS.footway));
-  out.push(strip(arm, [footStart, ARM_LENGTH], [-outEdge - 2.5, -outEdge - 0.5], LAYER.footway, COLOURS.footway));
+  const footway = (edge: number): [number, number] => [edge + FOOTWAY_OFFSET - FOOTWAY_WIDTH / 2, edge + FOOTWAY_OFFSET + FOOTWAY_WIDTH / 2];
+  out.push(strip(arm, [footStart, ARM_LENGTH], footway(rightEdge), LAYER.footway, COLOURS.footway));
+  const [near, far] = footway(leftEdge);
+  out.push(strip(arm, [footStart, ARM_LENGTH], [-far, -near], LAYER.footway, COLOURS.footway));
 };
 
 /** The junction square: a polygon through the corners where neighbouring arms' road surfaces meet it. */
@@ -176,8 +183,8 @@ const junctionSurface = (layout: Layout, radius: number) => {
   const sorted = [...layout.arms].sort((a, b) => a.bearing - b.bearing);
   // Going clockwise, each arm's right-of-inbound side comes first.
   const corners = sorted.flatMap((arm) => [
-    armPoint(arm, radius, surfaceEdge(arm, lanesIn(arm))),
-    armPoint(arm, radius, -surfaceEdge(arm, lanesOut(arm))),
+    armPoint(arm, radius, inEdge(arm)),
+    armPoint(arm, radius, -outEdge(arm)),
   ]);
   return polygon(corners.reverse(), LAYER.road, COLOURS.asphalt);
 };
@@ -214,7 +221,7 @@ const zebra = (layout: Layout) => {
       }
       return stripes;
     });
-  return named(parts, 'zebra');
+  return mergedMesh(parts, 'zebra');
 };
 
 /** Haaientanden: a row of white triangles across the inbound lanes, pointing at the traffic that gives way. */
@@ -235,6 +242,7 @@ const teeth = (layout: Layout, stop: number) => {
   );
   const mesh = new InstancedMesh(tooth, staticMaterial(), placements.length);
   mesh.name = 'haaientanden';
+  mesh.visible = placements.length > 0;
   const m = new Matrix4();
   const q = new Quaternion();
   placements.forEach(({ arm, at }, i) => {
@@ -278,10 +286,10 @@ const signs = (layout: Layout, stop: number) => {
   const parts = layout.arms.flatMap((arm) => {
     const sign = arm.control?.priority;
     if (!sign || sign === 'haaientanden') return [];
-    const at = armPoint(arm, stop + 0.8, surfaceEdge(arm, lanesIn(arm)) + 0.8);
+    const at = armPoint(arm, stop + 0.8, inEdge(arm) + 0.8);
     return [standAt(post(2.4), arm, at, 0), ...plate(sign).map((g) => standAt(g, arm, at, 2))];
   });
-  return named(parts, 'signs');
+  return mergedMesh(parts, 'signs');
 };
 
 const lampColours = (state: LightState) => ({
@@ -294,7 +302,7 @@ const lights = (layout: Layout, stop: number) => {
   const parts = layout.arms.flatMap((arm) => {
     const state = arm.control?.lights;
     if (!state) return [];
-    const at = armPoint(arm, stop + 0.3, surfaceEdge(arm, lanesIn(arm)) + 0.6);
+    const at = armPoint(arm, stop + 0.3, inEdge(arm) + 0.6);
     const colours = lampColours(state);
     return [
       standAt(post(2.2), arm, at, 0),
@@ -304,7 +312,7 @@ const lights = (layout: Layout, stop: number) => {
       ),
     ];
   });
-  return named(parts, 'lights');
+  return mergedMesh(parts, 'lights');
 };
 
 // ---- Meshes. ----
@@ -313,7 +321,7 @@ let shared: MeshLambertMaterial | undefined;
 /** One material for all static geometry: colour comes from the vertices. */
 const staticMaterial = () => (shared ??= new MeshLambertMaterial({ vertexColors: true, side: DoubleSide }));
 
-const named = (parts: BufferGeometry[], name: string) => {
+const mergedMesh = (parts: BufferGeometry[], name: string) => {
   const mesh = new Mesh(parts.length ? mergeGeometries(parts) : new BufferGeometry(), staticMaterial());
   mesh.name = name;
   mesh.visible = parts.length > 0;
@@ -366,8 +374,8 @@ export const buildScene = (layout: Layout, roadUsers: RoadUser[] = []): Group =>
   const group = new Group();
   group.name = 'layout';
   group.add(
-    named(ground, 'ground'),
-    named(lines, 'markings'),
+    mergedMesh(ground, 'ground'),
+    mergedMesh(lines, 'markings'),
     zebra(layout),
     teeth(layout, stop),
     signs(layout, stop),

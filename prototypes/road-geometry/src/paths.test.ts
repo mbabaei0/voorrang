@@ -98,6 +98,11 @@ describe('manoeuvrePath on other Layouts', () => {
     );
   });
 
+  it('refuses a Layout with only one arm', () => {
+    const stub: Layout = { kind: 't-junction', arms: [{ id: 's', bearing: 180 }] };
+    expect(() => manoeuvrePath(stub, { id: 'car', kind: 'car', arm: 's', manoeuvre: 'left' })).toThrow(/No arm to go left/);
+  });
+
   it('runs a tram on the right-hand of two tracks laid 1.5 m apart down the middle of the road', () => {
     const path = manoeuvrePath(tJunction, { id: 'tram', kind: 'tram', arm: 'w', manoeuvre: 'straight' });
     expect(plan(path.getPointAt(0))).toEqual([-30, -0.75]);

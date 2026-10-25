@@ -92,6 +92,7 @@ const destinationArm = (layout: Layout, from: Arm, manoeuvre: Exclude<Manoeuvre,
   const turn = { straight: 180, left: 90, right: -90 }[manoeuvre];
   const target = from.bearing + turn;
   const candidates = layout.arms.filter((a) => a !== from);
+  if (candidates.length === 0) throw new Error(`No arm to go ${manoeuvre} from "${from.id}"`);
   const best = candidates.reduce((x, y) => (angleBetween(x.bearing, target) <= angleBetween(y.bearing, target) ? x : y));
   if (angleBetween(best.bearing, target) > 60) throw new Error(`No arm to go ${manoeuvre} from "${from.id}"`);
   return best;
@@ -117,7 +118,7 @@ const turnCurve = (entry: Vector3, corner: Vector3, exit: Vector3) =>
 
 export const lanesIn = (arm: Arm) => arm.lanesIn ?? 1;
 export const lanesOut = (arm: Arm) => arm.lanesOut ?? 1;
-const rides = (kind: RoadUserKind) => kind === 'bicycle' || kind === 'moped' || kind === 'snorfiets';
+const ridesCycle = (kind: RoadUserKind) => kind === 'bicycle' || kind === 'moped' || kind === 'snorfiets';
 
 /** Distance from the carriageway edge to the middle of the cycle path. */
 const CYCLE_PATH_OFFSET = VERGE_WIDTH + CYCLE_PATH_WIDTH / 2;
@@ -126,13 +127,17 @@ const CYCLE_PATH_OFFSET = VERGE_WIDTH + CYCLE_PATH_WIDTH / 2;
 const sideOffset = (arm: Arm, lanes: number, user: RoadUser, lane: number): number => {
   const edge = lanes * LANE_WIDTH;
   if (user.kind === 'tram') return TRACK_SPACING / 2;
-  if (rides(user.kind)) return arm.cyclePath ? edge + CYCLE_PATH_OFFSET : edge - 1;
+  if (ridesCycle(user.kind)) return arm.cyclePath ? edge + CYCLE_PATH_OFFSET : edge - 1;
   return (lanes - lane - 0.5) * LANE_WIDTH;
 };
 
 /** The outer edge of the road surface on one side of an arm, measured from its centreline. */
-export const surfaceEdge = (arm: Arm, lanes: number) => lanes * LANE_WIDTH + (arm.cyclePath ? VERGE_WIDTH + CYCLE_PATH_WIDTH : 0);
-const halfWidth = (arm: Arm) => Math.max(surfaceEdge(arm, lanesIn(arm)), surfaceEdge(arm, lanesOut(arm)));
+const surfaceEdge = (arm: Arm, lanes: number) => lanes * LANE_WIDTH + (arm.cyclePath ? VERGE_WIDTH + CYCLE_PATH_WIDTH : 0);
+/** Outer edge of the road surface to the right of inbound traffic. */
+export const inEdge = (arm: Arm) => surfaceEdge(arm, lanesIn(arm));
+/** Outer edge of the road surface to the left of inbound traffic. */
+export const outEdge = (arm: Arm) => surfaceEdge(arm, lanesOut(arm));
+export const halfWidth = (arm: Arm) => Math.max(inEdge(arm), outEdge(arm));
 
 export const FOOTWAY_OFFSET = 1.5;
 /** Pedestrians cross an arm in a band this wide, just outside the junction; traffic waits behind it. */
@@ -149,8 +154,14 @@ export const junctionEdge = (layout: Layout) => {
 /** The distance from the centre at which pedestrians cross an arm: the middle of the crossing band. */
 export const crossingDistance = (layout: Layout) => junctionEdge(layout) + CROSSING_WIDTH / 2;
 
-/** Where traffic on an arm waits: behind the crossing band, so pedestrians cross in front of it. */
-export const stopLineDistance = (layout: Layout) => junctionEdge(layout) + CROSSING_WIDTH + STOP_LINE_GAP;
+/**
+ * Where traffic on an arm waits: behind the crossing band, so pedestrians cross in front of it. At a roundabout
+ * with a cycle ring, traffic crosses the cycle ring first and gives way at the carriageway, in the gap between.
+ */
+export const stopLineDistance = (layout: Layout) =>
+  layout.kind === 'roundabout' && hasCycleRing(layout)
+    ? ISLAND_RADIUS + RING_WIDTH + STOP_LINE_GAP
+    : junctionEdge(layout) + CROSSING_WIDTH + STOP_LINE_GAP;
 
 /** On foot across an arm, starting on the footway to the right of inbound traffic. */
 const crossingPath = (layout: Layout, arm: Arm): Path => {
@@ -158,8 +169,8 @@ const crossingPath = (layout: Layout, arm: Arm): Path => {
   const path: Path = new CurvePath();
   path.add(
     new LineCurve3(
-      armPoint(arm, along, surfaceEdge(arm, lanesIn(arm)) + FOOTWAY_OFFSET),
-      armPoint(arm, along, -surfaceEdge(arm, lanesOut(arm)) - FOOTWAY_OFFSET),
+      armPoint(arm, along, inEdge(arm) + FOOTWAY_OFFSET),
+      armPoint(arm, along, -outEdge(arm) - FOOTWAY_OFFSET),
     ),
   );
   return path;
@@ -233,7 +244,7 @@ const ringTangent = (a: number) => new Vector3(-Math.sin(a), 0, -Math.cos(a));
 const onRing = (radius: number, a: number) => new RingArc(radius, a, 0).getPoint(0);
 
 const roundaboutPath = (layout: Layout, user: RoadUser, from: Arm, to: Arm, inSide: number, outSide: number): Path => {
-  const radius = rides(user.kind) && hasCycleRing(layout) ? CYCLE_RING_RADIUS : RING_RADIUS;
+  const radius = ridesCycle(user.kind) && hasCycleRing(layout) ? CYCLE_RING_RADIUS : RING_RADIUS;
   const start = armPoint(from, ARM_LENGTH, inSide);
   const approach = ringPoint(from, radius + RING_APPROACH, inSide);
   const leave = ringPoint(to, radius + RING_APPROACH, outSide);
@@ -243,7 +254,7 @@ const roundaboutPath = (layout: Layout, user: RoadUser, from: Arm, to: Arm, inSi
   const sweep = (((planAngle(ringPoint(to, radius, outSide)) - RING_BLEND - joinAngle) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
   const leaveAngle = joinAngle + sweep;
   const join = onRing(radius, joinAngle);
-  const part = onRing(radius, leaveAngle);
+  const leaveRing = onRing(radius, leaveAngle);
   const inDir = approach.clone().sub(start).normalize();
   const outDir = end.clone().sub(leave).normalize();
 
@@ -260,8 +271,8 @@ const roundaboutPath = (layout: Layout, user: RoadUser, from: Arm, to: Arm, inSi
   path.add(new RingArc(radius, joinAngle, sweep));
   path.add(
     new CubicBezierCurve3(
-      part,
-      part.clone().addScaledVector(ringTangent(leaveAngle), RING_HANDLE),
+      leaveRing,
+      leaveRing.clone().addScaledVector(ringTangent(leaveAngle), RING_HANDLE),
       leave.clone().addScaledVector(outDir, -RING_HANDLE),
       leave,
     ),

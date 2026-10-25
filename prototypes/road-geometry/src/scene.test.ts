@@ -110,4 +110,26 @@ describe('buildScene', () => {
     for (const name of ['signs', 'lights', 'zebra']) expect(scene.getObjectByName(name)?.visible).toBe(false);
     expect((scene.getObjectByName('haaientanden') as InstancedMesh).count).toBe(0);
   });
+
+  it('on a roundabout with a cycle ring, gives way between the rings, where one car fits, with pedestrians crossing outside', () => {
+    const layout: Layout = {
+      kind: 'roundabout',
+      arms: [0, 90, 180, 270].map((bearing) => ({ id: `${bearing}`, bearing, cyclePath: true, control: { priority: 'haaientanden' as const, zebra: true } })),
+    };
+    const scene = buildScene(layout, [{ id: 'car', kind: 'car', arm: '180', manoeuvre: 'straight' }]);
+    // Island 8 m, carriageway ring to 13 m, cycle ring from 18 to 20 m.
+    const teeth = scene.getObjectByName('haaientanden') as InstancedMesh;
+    const at = new Vector3().setFromMatrixPosition(new Matrix4().fromArray(teeth.instanceMatrix.array, 0));
+    expect(at.length()).toBeGreaterThan(13);
+    expect(at.length()).toBeLessThan(14.5);
+    const car = boundsOf(scene, 'roadUser:car');
+    expect(-car.max.z).toBeLessThan(-13);
+    expect(-car.min.z).toBeGreaterThan(-18);
+    const zebra = boundsOf(scene, 'zebra');
+    expect(Math.min(...[zebra.min, zebra.max].map((v) => Math.max(Math.abs(v.x), Math.abs(v.z))))).toBeGreaterThan(20);
+  });
+
+  it('draws nothing for haaientanden when no arm has them', () => {
+    expect(buildScene(crossroadsWith(undefined)).getObjectByName('haaientanden')?.visible).toBe(false);
+  });
 });

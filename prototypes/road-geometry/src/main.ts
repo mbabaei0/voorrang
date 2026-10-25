@@ -52,6 +52,8 @@ let overlays = { paths: new Group(), conflicts: new Group() };
 const load = () => {
   const { layout, roadUsers } = presets[select.value]!;
   scene.remove(current, overlays.paths, overlays.conflicts);
+  // Free the old merged geometries; shared materials and the marker geometry stay.
+  for (const group of [current, overlays.paths]) group.traverse((o) => (o as Mesh | Line).geometry?.dispose());
   current = buildScene(layout, roadUsers);
   overlays = { paths: new Group(), conflicts: new Group() };
   for (const user of roadUsers) {
@@ -72,7 +74,8 @@ const render = () => {
   overlays.paths.visible = showPaths.checked;
   overlays.conflicts.visible = showConflicts.checked;
   const { clientWidth: w, clientHeight: h } = canvas;
-  if (canvas.width !== Math.floor(w * renderer.getPixelRatio())) {
+  const ratio = renderer.getPixelRatio();
+  if (canvas.width !== Math.floor(w * ratio) || canvas.height !== Math.floor(h * ratio)) {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
