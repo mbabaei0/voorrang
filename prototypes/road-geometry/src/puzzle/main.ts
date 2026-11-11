@@ -38,7 +38,7 @@ const KIND_LABEL: Record<RoadUserKind, string> = {
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!;
 const stage = $('#stage');
 const tray = $('#tray');
-const feedback = $<HTMLParagraphElement>('#feedback');
+const feedback = $<HTMLDivElement>('#feedback');
 const checkButton = $<HTMLButtonElement>('#check');
 const clearButton = $<HTMLButtonElement>('#clear');
 const settings = $<HTMLFormElement>('#settings');
@@ -52,7 +52,9 @@ stage.prepend(renderer.domElement);
 const labels = new CSS2DRenderer({ element: $('#labels') });
 
 const scene = new Scene();
-scene.background = new Color(0xdfe7ec);
+// The scene's backdrop follows the design tokens, so it matches the board in light and dark mode.
+const sceneBackground = () => new Color(getComputedStyle(document.documentElement).getPropertyValue('--surface-sunk').trim() || '#dde1dc');
+scene.background = sceneBackground();
 scene.add(new HemisphereLight(0xffffff, 0x667755, 2));
 const sun = new DirectionalLight(0xffffff, 1.5);
 sun.position.set(20, 40, 10);
@@ -88,7 +90,7 @@ let crashMarker: Mesh | null = null;
 let meeting = new Set<string>();
 const meet = (a: string, b: string) => meeting.has(`${a}|${b}`);
 const proxyMaterial = new MeshBasicMaterial();
-const crashMaterial = new MeshBasicMaterial({ color: 0xcf222e });
+const crashMaterial = new MeshBasicMaterial({ color: 0xc4122f });
 
 const user = (id: string) => scenario.roadUsers.find((u) => u.id === id)!;
 const label = (id: string) => {
@@ -126,7 +128,7 @@ const loadScenario = (next: Scenario) => {
     mesh.add(proxy);
     proxies.push(proxy);
     const badge = document.createElement('div');
-    badge.className = 'badge';
+    badge.className = 'scene-badge';
     const holder = new CSS2DObject(badge);
     holder.position.set(0, roadUserHeight(u.kind) / 2 + 1.2, 0);
     mesh.add(holder);
@@ -157,7 +159,7 @@ const update = () => {
   renderTray(stepIndex);
   const complete = answer.order.length === scenario.roadUsers.length;
   checkButton.disabled = phase === 'replaying' || (phase === 'answering' && !complete);
-  checkButton.textContent = phase === 'done' ? (result?.verdict === 'correct' ? 'Next' : 'Show correct order') : 'Check';
+  checkButton.textContent = phase === 'done' ? (result?.verdict === 'correct' ? 'Next puzzle' : 'Show the right order') : 'Check order';
   clearButton.textContent = phase === 'done' ? 'Try again' : 'Clear';
   clearButton.disabled = phase === 'replaying';
   $('#prompt').textContent =
@@ -165,7 +167,7 @@ const update = () => {
       ? ''
       : inputMode() === 'scene'
         ? 'Tap the road users in the order they may go. Tap again to take one back.'
-        : 'Tap the chips in the order the road users may go. Drag a chip to move it.';
+        : 'Tap the road users below in the order they may go. Drag one to move it.';
   render();
 };
 
@@ -175,7 +177,12 @@ const chip = (id: string, num?: number) => {
   el.className = `chip${num ? ' placed' : ''}`;
   el.dataset.id = id;
   const colour = `#${roadUserColour(user(id).kind).toString(16).padStart(6, '0')}`;
-  el.innerHTML = `${num ? `<span class="num">${num}</span>` : ''}<span class="swatch" style="background:${colour}"></span>${label(id)}`;
+  el.setAttribute('aria-pressed', String(!!num));
+  el.innerHTML = `<span class="chip-slot" aria-hidden="true">${
+    num
+      ? `<span class="order-badge${result?.verdict === 'wrong' && result.tooEarly === id ? ' order-badge--wrong' : ''}">${num}</span>`
+      : `<span class="chip-swatch" style="background:${colour}"></span>`
+  }</span><span>${label(id)}</span>`;
   return el;
 };
 
@@ -185,7 +192,7 @@ const renderTray = (stepIndex: Map<string, number>) => {
     if (k > 0 && tiesAllowed()) {
       const link = document.createElement('button');
       link.type = 'button';
-      link.className = 'link';
+      link.className = 'tie';
       link.textContent = '+';
       link.title = 'Go together';
       link.setAttribute('aria-label', `${label(answer.order[k - 1]!)} and ${label(id)} go together`);
@@ -211,7 +218,7 @@ const renderTray = (stepIndex: Map<string, number>) => {
     const rest = scenario.roadUsers.filter((u) => !answer.order.includes(u.id));
     if (rest.length) {
       const pool = document.createElement('div');
-      pool.style.cssText = 'flex-basis:100%;display:flex;flex-wrap:wrap;gap:4px;padding-top:6px;border-top:1px dashed var(--line)';
+      pool.className = 'tray-pool';
       for (const u of rest) {
         const el = chip(u.id);
         el.onclick = () => {
@@ -367,19 +374,30 @@ const showCrash = () => {
   glideTo(c.at.clone().add(offset), c.at.clone());
 };
 
+/** A bold verdict line, then the explanation, as on the landing page. */
+const showFeedback = (verdict: string, explanation: string) => {
+  const head = document.createElement('p');
+  head.append(Object.assign(document.createElement('strong'), { textContent: verdict }));
+  const body = Object.assign(document.createElement('p'), { className: 'explain', textContent: explanation });
+  feedback.replaceChildren(head, ...(explanation ? [body] : []));
+};
+
 const finishReplay = () => {
   phase = 'done';
   if (result?.verdict === 'wrong') {
     const why = scenario.explanations[result.tooEarly] ?? '';
-    feedback.textContent = replay?.collision
-      ? `${label(result.tooEarly)} went too early and ran into the ${label(replay.collision.hit).toLowerCase()}. ${why}`
-      : `${label(result.tooEarly)} went too early: it had to wait for ${list(result.waitedFor)}. ${why}`;
-    feedback.className = 'bad';
+    showFeedback(
+      replay?.collision
+        ? `${label(result.tooEarly)} went too early and ran into the ${label(replay.collision.hit).toLowerCase()}.`
+        : `${label(result.tooEarly)} went too early: it had to wait for ${list(result.waitedFor)}.`,
+      why,
+    );
+    feedback.className = 'stage-feedback feedback feedback--bad';
     if (replay?.collision) showCrash();
   } else {
     const lead = showingSolution ? 'This is the right order.' : 'Correct.';
-    feedback.textContent = `${lead} ${Object.values(scenario.explanations).join(' ')}`;
-    feedback.className = 'good';
+    showFeedback(lead, Object.values(scenario.explanations).join(' '));
+    feedback.className = 'stage-feedback feedback feedback--good';
   }
   feedback.hidden = false;
   reportFrames();
@@ -493,6 +511,12 @@ controls.addEventListener('start', () => {
 });
 controls.addEventListener('change', render);
 addEventListener('resize', render);
+// The sheet can change height on phones (prompt, feedback), which resizes the board.
+new ResizeObserver(() => render()).observe(stage);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  scene.background = sceneBackground();
+  render();
+});
 
 // Variants can be preselected from the URL, e.g. ?input=tray&ties=strict&speed=2&orbit=on, to share a test setup.
 for (const [name, value] of new URLSearchParams(location.search)) {

@@ -2,23 +2,57 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Road geometry prototype</title>
-    <style>
-      html, body { margin: 0; height: 100%; background: #dfe7ec; font: 14px/1.4 system-ui, sans-serif; }
-      canvas { display: block; width: 100%; height: 100%; touch-action: none; }
-      #hud { position: fixed; top: 8px; left: 8px; right: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
-        background: rgb(255 255 255 / 0.9); padding: 8px; border-radius: 8px; max-width: 640px; }
-      #stats { font-variant-numeric: tabular-nums; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Road geometry · Voorrang</title>
+    <meta name="theme-color" content="#e8ebe7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1f2225" media="(prefers-color-scheme: dark)" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/design/system.css" />
+    <link rel="stylesheet" href="/src/design/app.css" />
   </head>
-  <body>
-    <div id="hud">
-      <select id="layout"></select>
-      <label><input type="checkbox" id="paths" checked /> paths</label>
-      <label><input type="checkbox" id="conflicts" checked /> conflicts</label>
-      <span id="stats"></span>
-    </div>
+  <body class="app">
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <symbol id="brand-mark" viewBox="0 0 36 36">
+        <rect width="36" height="36" rx="7" style="fill: var(--ink)" />
+        <path d="M5 12h7.3l-3.65 10zM14.35 12h7.3L18 22zM23.7 12H31l-3.65 10z" style="fill: var(--bg)" />
+      </symbol>
+    </svg>
+
+    <header class="site-header" style="padding-inline: var(--gutter)">
+      <a class="brand" href="./">
+        <svg class="brand-mark" aria-hidden="true"><use href="#brand-mark" /></svg>
+        Voorrang
+      </a>
+      <nav class="site-nav" aria-label="Main">
+        <a href="puzzle.html">Puzzle</a>
+        <a href="rules.html">Rules</a>
+      </nav>
+    </header>
+
+    <main class="workspace">
+      <div id="stage" class="stage">
+        <div id="hud" class="stage-tools">
+          <select id="layout" class="select" aria-label="Layout"></select>
+          <label class="toggle"><input type="checkbox" id="paths" checked /> Paths</label>
+          <label class="toggle"><input type="checkbox" id="conflicts" checked /> Conflicts</label>
+        </div>
+        <p id="stats" class="stage-stats"></p>
+      </div>
+
+      <aside class="sheet" aria-labelledby="geo-title">
+        <h1 id="geo-title">Road geometry</h1>
+        <p class="prompt">
+          Every layout is built from its arms and controls. Blue lines are road users’ paths; dots mark where they meet, red
+          where they cross and yellow where they merge. Drag to turn the view.
+        </p>
+        <div class="actions">
+          <a class="btn btn--action" href="puzzle.html">Try the puzzle</a>
+          <a class="btn btn--quiet" href="design-system.html">Design system</a>
+        </div>
+      </aside>
+    </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -1,0 +1,411 @@
+/*
+ * App shell for the full-screen 3D pages (puzzle, road geometry).
+ * Same header, tokens and components as the landing page; the 3D scene sits on a board
+ * like the landing page's crossroads, with a sheet beside it (below it on phones).
+ */
+
+html,
+body {
+  height: 100%;
+}
+
+body.app {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100dvh;
+  overflow: hidden;
+}
+
+body.app .site-header {
+  padding-block: var(--s-3);
+}
+
+.workspace {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: var(--s-3);
+  min-height: 0;
+  padding: 0 var(--gutter) max(var(--s-3), env(safe-area-inset-bottom));
+}
+
+@media (min-width: 60rem) {
+  .workspace {
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 24rem;
+    gap: var(--s-5);
+    padding-bottom: var(--s-5);
+  }
+}
+
+/* ---------- The board holding the 3D scene ---------- */
+
+.stage {
+  position: relative;
+  min-height: 0;
+  border-radius: var(--r-board);
+  background: var(--surface-sunk);
+  box-shadow: var(--shadow-board);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.stage canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.stage-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Tools float over the top of the board. */
+.stage-tools {
+  position: absolute;
+  top: var(--s-3);
+  left: var(--s-3);
+  right: var(--s-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  pointer-events: none;
+}
+
+.stage-tools > * {
+  pointer-events: auto;
+}
+
+.tool,
+.select {
+  min-height: 40px;
+  padding: var(--s-2) var(--s-3);
+  border: 0;
+  border-radius: var(--r-sign);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tool:hover {
+  background: var(--surface);
+}
+
+.tool[aria-pressed='true'],
+.tool[aria-expanded='true'] {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.select {
+  max-width: 100%;
+  padding-right: 2.25rem;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23808890' stroke-width='2'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+}
+
+/* Camera presets: one control, three choices. */
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: var(--r-sign);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+}
+
+.segmented .tool {
+  min-height: 34px;
+  padding: var(--s-1) var(--s-3);
+  background: transparent;
+  box-shadow: none;
+  border-radius: 4px;
+}
+
+.segmented .tool[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 40px;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-sign);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toggle input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--info);
+}
+
+/* Settings popover. */
+.panel {
+  flex-basis: 100%;
+  max-width: 26rem;
+  display: grid;
+  gap: var(--s-4);
+  padding: var(--s-5);
+  border-radius: var(--r-sign);
+  background: var(--surface);
+  box-shadow: 0 12px 32px -8px rgb(0 0 0 / 0.3);
+  max-height: calc(100% - 4rem);
+  overflow: auto;
+}
+
+.panel[hidden] {
+  display: none;
+}
+
+.panel fieldset {
+  display: grid;
+  gap: var(--s-1);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.panel legend {
+  margin-bottom: var(--s-2);
+  font-weight: 720;
+}
+
+.panel label {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 32px;
+  cursor: pointer;
+}
+
+.panel input {
+  margin: 0;
+  accent-color: var(--info);
+}
+
+.panel .t-cite {
+  margin: 0;
+}
+
+/* Feedback floats over the bottom of the board, so the scene never jumps. */
+.stage-feedback {
+  position: absolute;
+  left: var(--s-3);
+  right: var(--s-3);
+  bottom: var(--s-3);
+  margin: 0;
+  box-shadow: 0 8px 24px -8px rgb(0 0 0 / 0.3);
+  background-color: var(--surface);
+}
+
+.stage-feedback.feedback--good {
+  background: linear-gradient(var(--good-bg), var(--good-bg)), var(--surface);
+}
+
+.stage-feedback.feedback--bad {
+  background: linear-gradient(var(--bad-bg), var(--bad-bg)), var(--surface);
+}
+
+.stage-feedback[hidden] {
+  display: none;
+}
+
+@media (min-width: 60rem) {
+  .stage-feedback {
+    max-width: 40rem;
+  }
+}
+
+.stage-stats {
+  position: absolute;
+  left: var(--s-3);
+  bottom: var(--s-3);
+  margin: 0;
+  padding: var(--s-1) var(--s-3);
+  border-radius: var(--r-sign);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  font-size: var(--step--1);
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Order badges in the 3D scene (CSS2D labels) ---------- */
+
+.scene-badge {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  color: var(--asphalt);
+  font: 800 15px/1 var(--font);
+  font-variant-numeric: tabular-nums;
+  isolation: isolate;
+}
+
+.scene-badge::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  z-index: -1;
+  transform: rotate(45deg);
+  border-radius: 3px;
+  background: var(--priority);
+  box-shadow: 0 0 0 2.5px #fff, 0 3px 8px rgb(0 0 0 / 0.35);
+}
+
+/* Road users who go together share a step: outlined in guidance blue. */
+.scene-badge.tied::before {
+  box-shadow: 0 0 0 2.5px #fff, 0 0 0 5px var(--info), 0 3px 8px rgb(0 0 0 / 0.35);
+}
+
+.scene-badge.wrong {
+  color: #fff;
+}
+
+.scene-badge.wrong::before {
+  background: var(--signal);
+}
+
+/* ---------- Sheet: title, prompt, tray and actions ---------- */
+
+.sheet {
+  display: grid;
+  align-content: start;
+  gap: var(--s-4);
+  padding: var(--s-4) var(--s-5) var(--s-5);
+  border-radius: var(--r-board);
+  background: var(--surface);
+}
+
+.sheet h1 {
+  font-size: var(--step-3);
+  font-weight: 820;
+  font-variation-settings: 'wdth' 75;
+  line-height: 1.05;
+}
+
+.sheet .prompt {
+  margin: 0;
+  color: var(--ink-muted);
+  min-height: 3.1em;
+}
+
+.sheet .prompt:empty {
+  display: none;
+}
+
+.tray {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: flex-start;
+  gap: var(--s-2);
+  min-height: 44px;
+}
+
+.tray .chip.placed {
+  border-color: var(--priority-deep);
+}
+
+.tray .chip.dragging {
+  opacity: 0.6;
+  z-index: 1;
+}
+
+.tray .chip:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.tray-pool {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  padding-top: var(--s-3);
+  border-top: 2px dashed var(--line);
+}
+
+/* "Go together" link between two chips. */
+.tie {
+  width: 32px;
+  height: 32px;
+  border: 1.5px dashed var(--line);
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--ink-muted);
+  font: 700 15px/1 var(--font);
+  cursor: pointer;
+}
+
+.tie[aria-pressed='true'] {
+  border-style: solid;
+  border-color: var(--info);
+  background: var(--info);
+  color: #fff;
+}
+
+.sheet .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+}
+
+.sheet .actions .btn {
+  flex: 1 1 auto;
+}
+
+@media (min-width: 60rem) {
+  .sheet {
+    padding: var(--s-6);
+    gap: var(--s-5);
+  }
+
+  .sheet h1 {
+    font-size: var(--step-4);
+  }
+
+  .sheet .actions {
+    margin-top: var(--s-2);
+  }
+}
+
+/* Short phones: keep the scene as large as possible. */
+@media (max-width: 59.99rem) {
+  body.app .site-header .brand {
+    font-size: var(--step-1);
+  }
+
+  body.app .brand-mark {
+    width: 30px;
+    height: 30px;
+  }
+
+  .sheet {
+    gap: var(--s-3);
+    padding: var(--s-4);
+  }
+
+  .sheet .prompt {
+    min-height: 0;
+  }
+}

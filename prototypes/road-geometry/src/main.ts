@@ -20,12 +20,13 @@ import { presets } from './presets';
 import { buildScene } from './scene';
 
 const canvas = document.createElement('canvas');
-document.body.prepend(canvas);
+document.querySelector<HTMLElement>('#stage')!.prepend(canvas);
 const renderer = new WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 
 const scene = new Scene();
-scene.background = new Color(0xdfe7ec);
+const sceneBackground = () => new Color(getComputedStyle(document.documentElement).getPropertyValue('--surface-sunk').trim() || '#dde1dc');
+scene.background = sceneBackground();
 scene.add(new HemisphereLight(0xffffff, 0x667755, 2));
 const sun = new DirectionalLight(0xffffff, 1.5);
 sun.position.set(20, 40, 10);
@@ -42,8 +43,8 @@ const showConflicts = document.querySelector<HTMLInputElement>('#conflicts')!;
 const stats = document.querySelector<HTMLSpanElement>('#stats')!;
 for (const name of Object.keys(presets)) select.add(new Option(name, name));
 
-const pathMaterial = new LineBasicMaterial({ color: 0x1060ff });
-const conflictMaterials = { cross: new MeshBasicMaterial({ color: 0xff2020 }), merge: new MeshBasicMaterial({ color: 0xff9900 }) };
+const pathMaterial = new LineBasicMaterial({ color: 0x1c4f9c });
+const conflictMaterials = { cross: new MeshBasicMaterial({ color: 0xc4122f }), merge: new MeshBasicMaterial({ color: 0xf5b301 }) };
 const marker = new SphereGeometry(0.35, 12, 8);
 
 let current = new Group();
@@ -86,7 +87,7 @@ const render = () => {
   // Overlays are debug aids; count the scene as the app would draw it.
   const { calls, triangles } = renderer.info.render;
   const overlayCalls = (showPaths.checked ? overlays.paths.children.length : 0) + (showConflicts.checked ? overlays.conflicts.children.length : 0);
-  stats.textContent = `${calls - overlayCalls} draw calls (+${overlayCalls} overlay) · ${triangles} tris · ${ms.toFixed(1)} ms CPU`;
+  stats.textContent = `${calls - overlayCalls} draw calls, +${overlayCalls} overlay, ${triangles} triangles, ${ms.toFixed(1)} ms`;
 };
 
 controls.addEventListener('change', render);
@@ -94,4 +95,9 @@ select.addEventListener('change', load);
 showPaths.addEventListener('change', render);
 showConflicts.addEventListener('change', render);
 addEventListener('resize', render);
+new ResizeObserver(() => render()).observe(canvas);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  scene.background = sceneBackground();
+  render();
+});
 load();

@@ -49,17 +49,17 @@ import {
 } from './layout';
 
 const COLOURS = {
-  grass: 0x7fb069,
-  island: 0x6a9e57,
-  asphalt: 0x4a4e54,
+  grass: 0x93ad7f,
+  island: 0x7f9a6c,
+  asphalt: 0x464c52,
   unpaved: 0x9b8565,
   brick: 0x9c6b52,
-  cyclePath: 0xb5413a,
-  footway: 0xc9c3b8,
-  white: 0xf4f4f0,
+  cyclePath: 0xa9473d,
+  footway: 0xbfc4bf,
+  white: 0xf4f5f2,
   rail: 0x2b2b2b,
-  signRed: 0xd0202a,
-  signYellow: 0xf3c400,
+  signRed: 0xc4122f,
+  signYellow: 0xf5b301,
   post: 0x8a8f96,
   housing: 0x1d1f22,
 };
