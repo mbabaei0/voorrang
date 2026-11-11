@@ -10,7 +10,7 @@ These are throwaway prototypes. They answer [ticket 0008](../../wayfinder/0008-p
 
 - `src/puzzle/answer.ts`: the learner's answer (tap, link, move) and `score` against the Passing order.
 - `src/puzzle/replay.ts`: `scheduleReplay`, which times each road user's Replay and stages the collision on a wrong answer.
-- `src/puzzle/scenarios.ts` and `src/puzzle/main.ts`: the puzzle page, with interaction variants under "Variants" or from the URL (`?input=tray&ties=links&speed=2&orbit=on`).
+- `src/puzzle/scenarios.ts` and `src/puzzle/main.ts`: the puzzle page, with interaction variants under "Settings" or from the URL (`?input=scene&ties=links&speed=2&orbit=on`). Defaults: the list plus tapping in the scene, the You camera, 1.5× replay.
 
 The site around them:
 

@@ -409,3 +409,9 @@ body.app .site-header {
     min-height: 0;
   }
 }
+
+/* Nothing chosen yet: no divider above the road users. */
+.tray > .tray-pool:first-child {
+  padding-top: 0;
+  border-top: 0;
+}

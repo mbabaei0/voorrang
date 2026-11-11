@@ -145,7 +145,7 @@ const loadScenario = (next: Scenario) => {
   }
   scene.add(world);
   $('#title').textContent = scenario.title;
-  setCamera(cameraPreset ?? 'angled', false);
+  setCamera(cameraPreset ?? 'you', false);
   update();
 };
 
@@ -176,7 +176,7 @@ const update = () => {
       ? ''
       : inputMode() === 'scene'
         ? 'Tap the road users in the order they may go. Tap again to take one back.'
-        : 'Tap the road users below in the order they may go. Drag one to move it.';
+        : 'Tap the road users below, or in the scene, in the order they may go. Drag one to move it.';
   render();
 };
 
@@ -319,7 +319,7 @@ renderer.domElement.addEventListener('pointerdown', (e) => (down = { x: e.client
 renderer.domElement.addEventListener('pointerup', (e) => {
   const isTap = down && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 8 && performance.now() - down.t < 500;
   down = null;
-  if (!isTap || phase !== 'answering' || inputMode() !== 'scene') return;
+  if (!isTap || phase !== 'answering') return;
   const rect = renderer.domElement.getBoundingClientRect();
   const ndc = new Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
   raycaster.setFromCamera(ndc, camera);
