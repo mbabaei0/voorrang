@@ -21,13 +21,10 @@ import {
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   ARM_LENGTH,
-  CYCLE_RING_RADIUS,
   FOOTWAY_OFFSET,
-  ISLAND_RADIUS,
-  RING_WIDTH,
   armPoint,
   halfWidth,
-  hasCycleRing,
+  junctionEdge,
   type Layout,
   type RoadUser,
   type RoadUserKind,
@@ -371,7 +368,7 @@ const clearance = (layout: Layout, p: Vector3) => {
     }
   }
   if (layout.kind === 'roundabout') {
-    const ringOuter = (hasCycleRing(layout) ? CYCLE_RING_RADIUS + 1 : ISLAND_RADIUS + RING_WIDTH) + FOOTWAY_OUTER;
+    const ringOuter = junctionEdge(layout) + FOOTWAY_OUTER;
     const d = p.length() - ringOuter;
     if (d < best) {
       best = d;

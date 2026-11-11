@@ -34,6 +34,11 @@ export type Control = {
 export type Layout = {
   kind: LayoutKind;
   arms: Arm[];
+  /**
+   * A roundabout built as a turbo roundabout: a two-lane ring whose lanes spiral outward, kept apart by raised
+   * lane dividers. The two opposite arms with two lanes out are the main road.
+   */
+  turbo?: boolean;
 };
 
 export type RoadUserKind = 'car' | 'bicycle' | 'moped' | 'snorfiets' | 'pedestrian' | 'tram' | 'bus' | 'voorrangsvoertuig';
@@ -148,6 +153,7 @@ const STOP_LINE_GAP = 0.5;
 /** Where the junction ends on every arm: the edge of the junction square, or the outside of a roundabout's rings. */
 export const junctionEdge = (layout: Layout) => {
   if (layout.kind !== 'roundabout') return junctionRadius(layout);
+  if (isTurbo(layout)) return TURBO_EDGE;
   return hasCycleRing(layout) ? CYCLE_RING_RADIUS + CYCLE_PATH_WIDTH / 2 : ISLAND_RADIUS + RING_WIDTH;
 };
 
@@ -187,6 +193,7 @@ export const manoeuvrePath = (layout: Layout, user: RoadUser): Path => {
   const inSide = sideOffset(from, lanesIn(from), user, user.lane ?? 0);
   // Outbound traffic on `to` drives on its right, which is the left of inbound traffic.
   const outSide = -sideOffset(to, lanesOut(to), user, 0);
+  if (isTurbo(layout) && !ridesCycle(user.kind) && user.kind !== 'tram') return turboPath(layout, user, from, to, inSide);
   if (layout.kind === 'roundabout') return roundaboutPath(layout, user, from, to, inSide, outSide);
   const start = armPoint(from, ARM_LENGTH, inSide);
   const entry = armPoint(from, radius, inSide);
@@ -211,19 +218,24 @@ export const CYCLE_RING_RADIUS = ISLAND_RADIUS + RING_WIDTH + CYCLE_RING_SETBACK
 
 export const hasCycleRing = (layout: Layout) => layout.arms.some((arm) => arm.cyclePath);
 
-/** Anticlockwise seen from above (traffic keeps right), from one angle to another, in scene x/z. */
+/**
+ * Anticlockwise seen from above (traffic keeps right), from one angle to another, in scene x/z. With `growth`
+ * (metres per radian) the radius grows as it goes: a spiral, as the lanes of a turbo roundabout.
+ */
 class RingArc extends Curve<Vector3> {
   constructor(
     private readonly radius: number,
     private readonly from: number,
     private readonly sweep: number,
+    private readonly growth = 0,
   ) {
     super();
   }
   override getPoint(t: number, target = new Vector3()) {
     const a = this.from + this.sweep * t;
+    const r = this.radius + this.growth * this.sweep * t;
     // Plan angle anticlockwise from east; scene z points south.
-    return target.set(this.radius * Math.cos(a), 0, -this.radius * Math.sin(a));
+    return target.set(r * Math.cos(a), 0, -r * Math.sin(a));
   }
 }
 
@@ -239,46 +251,172 @@ const RING_BLEND = 0.4;
 const RING_APPROACH = 4;
 const RING_HANDLE = 2.5;
 
-/** Direction of anticlockwise travel at a plan angle on the ring, in scene x/z. */
-const ringTangent = (a: number) => new Vector3(-Math.sin(a), 0, -Math.cos(a));
+/** Direction of anticlockwise travel at a plan angle on a ring of radius `r` growing by `growth` per radian. */
+const ringTangent = (a: number, r = 1, growth = 0) =>
+  new Vector3(growth * Math.cos(a) - r * Math.sin(a), 0, -(growth * Math.sin(a) + r * Math.cos(a))).normalize();
 const onRing = (radius: number, a: number) => new RingArc(radius, a, 0).getPoint(0);
 
-const roundaboutPath = (layout: Layout, user: RoadUser, from: Arm, to: Arm, inSide: number, outSide: number): Path => {
-  const radius = ridesCycle(user.kind) && hasCycleRing(layout) ? CYCLE_RING_RADIUS : RING_RADIUS;
-  const start = armPoint(from, ARM_LENGTH, inSide);
-  const approach = ringPoint(from, radius + RING_APPROACH, inSide);
-  const leave = ringPoint(to, radius + RING_APPROACH, outSide);
-  const end = armPoint(to, ARM_LENGTH, outSide);
+const TWO_PI = 2 * Math.PI;
+const mod = (x: number, m: number) => ((x % m) + m) % m;
+
+/**
+ * Onto a ring from one arm, anticlockwise round it and off along another. `radiusAt` gives the ring's radius at
+ * a plan angle where the route joins it; from there it grows by `growth` metres per radian. The route runs
+ * between `start` and `end` metres out along the two arms.
+ */
+const ringRoute = (
+  from: Arm,
+  inSide: number,
+  to: Arm,
+  outSide: number,
+  radiusAt: (angle: number) => number,
+  growth = 0,
+  start = ARM_LENGTH,
+  end = ARM_LENGTH,
+): Path => {
   // Join the ring a little anticlockwise of where the lane line meets it, and leave a little before.
-  const joinAngle = planAngle(ringPoint(from, radius, inSide)) + RING_BLEND;
-  const sweep = (((planAngle(ringPoint(to, radius, outSide)) - RING_BLEND - joinAngle) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  const joinAngle = planAngle(ringPoint(from, radiusAt(armAngle(from)), inSide)) + RING_BLEND;
+  const radius = radiusAt(joinAngle);
+  let leaveRadius = radius;
+  let sweep = 0;
+  // On a spiral, where the route leaves depends on how far round it has grown; two rounds settle it.
+  for (let i = 0; i < 2; i++) {
+    sweep = mod(planAngle(ringPoint(to, leaveRadius, outSide)) - RING_BLEND - joinAngle, TWO_PI);
+    leaveRadius = radius + growth * sweep;
+  }
   const leaveAngle = joinAngle + sweep;
+  const startPoint = armPoint(from, start, inSide);
+  const approach = ringPoint(from, radius + RING_APPROACH, inSide);
+  const leave = ringPoint(to, leaveRadius + RING_APPROACH, outSide);
+  const endPoint = armPoint(to, end, outSide);
   const join = onRing(radius, joinAngle);
-  const leaveRing = onRing(radius, leaveAngle);
-  const inDir = approach.clone().sub(start).normalize();
-  const outDir = end.clone().sub(leave).normalize();
+  const leaveRing = onRing(leaveRadius, leaveAngle);
+  const inDir = approach.clone().sub(startPoint).normalize();
+  const outDir = endPoint.clone().sub(leave).normalize();
 
   const path: Path = new CurvePath();
-  path.add(new LineCurve3(start, approach));
+  path.add(new LineCurve3(startPoint, approach));
   path.add(
     new CubicBezierCurve3(
       approach,
       approach.clone().addScaledVector(inDir, RING_HANDLE),
-      join.clone().addScaledVector(ringTangent(joinAngle), -RING_HANDLE),
+      join.clone().addScaledVector(ringTangent(joinAngle, radius, growth), -RING_HANDLE),
       join,
     ),
   );
-  path.add(new RingArc(radius, joinAngle, sweep));
+  path.add(new RingArc(radius, joinAngle, sweep, growth));
   path.add(
     new CubicBezierCurve3(
       leaveRing,
-      leaveRing.clone().addScaledVector(ringTangent(leaveAngle), RING_HANDLE),
+      leaveRing.clone().addScaledVector(ringTangent(leaveAngle, leaveRadius, growth), RING_HANDLE),
       leave.clone().addScaledVector(outDir, -RING_HANDLE),
       leave,
     ),
   );
-  path.add(new LineCurve3(leave, end));
+  path.add(new LineCurve3(leave, endPoint));
   return path;
+};
+
+const roundaboutPath = (layout: Layout, user: RoadUser, from: Arm, to: Arm, inSide: number, outSide: number): Path => {
+  const radius = ridesCycle(user.kind) && hasCycleRing(layout) ? CYCLE_RING_RADIUS : RING_RADIUS;
+  return ringRoute(from, inSide, to, outSide, () => radius);
+};
+
+// ---- Turbo roundabouts. ----
+//
+// Each lane of the ring begins on the inside, at the left-hand entry lane of a main road arm, and moves out by
+// one lane every half turn: by the opposite main arm it has become the outer lane, and it ends where it began,
+// as the right-hand exit lane. So the island spirals too, with a step at each main arm where a new lane starts.
+
+export const isTurbo = (layout: Layout) => layout.kind === 'roundabout' && !!layout.turbo;
+
+export const TURBO_LANE = 3.5;
+const TURBO_DIVIDER = 0.3;
+/** Between neighbouring lane centres: how far a lane moves out every half turn. */
+export const TURBO_TRACK = TURBO_LANE + TURBO_DIVIDER;
+/** Centre of a lane where it begins, beside the island. */
+const TURBO_START = 8.6;
+/** How fast a lane spirals outward, in metres per radian. */
+export const TURBO_GROWTH = TURBO_TRACK / Math.PI;
+/** The centre of a lane `phi` radians round from the main arm where it begins. */
+export const turboLaneRadius = (phi: number) => TURBO_START + TURBO_GROWTH * phi;
+/** The outside of the ring at its widest, just before a main arm, where the outer lane ends. */
+const TURBO_EDGE = turboLaneRadius(TWO_PI) + TURBO_LANE / 2;
+
+/** An arm's plan angle: anticlockwise from east, in radians. */
+export const armAngle = (arm: Arm) => Math.PI / 2 - (arm.bearing * Math.PI) / 180;
+
+/** The main road of a turbo roundabout: the two opposite arms with two lanes out. Each starts a lane. */
+export const turboMains = (layout: Layout): Arm[] => {
+  const mains = layout.arms.filter((arm) => lanesOut(arm) === 2);
+  if (mains.length !== 2 || angleBetween(mains[0]!.bearing, mains[1]!.bearing) !== 180) {
+    throw new Error('A turbo roundabout needs two opposite main arms with two lanes out');
+  }
+  return mains;
+};
+
+/** How far round from where it began (radians, 0 to π) the inner lane is at a plan angle. */
+export const turboInnerPhi = (layout: Layout, angle: number) =>
+  Math.min(...turboMains(layout).map((main) => mod(angle - armAngle(main), TWO_PI)));
+
+/** The outside of the ring at a plan angle. */
+export const turboOuterEdge = (layout: Layout, angle: number) => turboLaneRadius(turboInnerPhi(layout, angle) + Math.PI) + TURBO_LANE / 2;
+
+/**
+ * A road user on a turbo roundabout keeps the lane it chose before the entry. The left-hand entry lane joins the
+ * inner ring lane, the right-hand one the outer. It can leave at a main arm from either lane (inner to the left
+ * exit lane, outer to the right one), at a side arm only from the outer lane, and nowhere past where its lane ends.
+ */
+const turboPath = (layout: Layout, user: RoadUser, from: Arm, to: Arm, inSide: number): Path => {
+  const entry = armAngle(from) + RING_BLEND;
+  const inner = turboInnerPhi(layout, entry);
+  const left = (user.lane ?? 0) >= 1;
+  if (left && user.manoeuvre === 'right') throw new Error('On a turbo roundabout you turn right from the right-hand lane');
+  const phi = left ? inner : inner + Math.PI;
+  /** Where this road user's lane began. */
+  const laneStart = entry - phi;
+  const phiAt = (angle: number) => mod(angle - laneStart, TWO_PI);
+  // Round to the destination, counting the main arm where the lane began as the end of the lane.
+  const phiExit = TWO_PI - mod(laneStart - armAngle(to), TWO_PI);
+  if (phiExit < phi) throw new Error(`From lane ${user.lane ?? 0} on "${from.id}" you cannot reach "${to.id}"`);
+  const main = lanesOut(to) === 2;
+  if (!main && phiExit < Math.PI) throw new Error(`"${to.id}" can only be reached from the outer ring lane`);
+  const exitLane = main && phiExit < Math.PI * 1.5 ? 1 : 0;
+  const outSide = -sideOffset(to, lanesOut(to), user, exitLane);
+  return ringRoute(from, inSide, to, outSide, (angle) => turboLaneRadius(phiAt(angle)), TURBO_GROWTH);
+};
+
+/** How far round from its main arm (radians) a divider begins: once the left entry lane has joined the ring. */
+const DIVIDER_START = 0.55;
+/** A divider stays open this far (radians) either side of a side road, where its left lane crosses the outer ring lane. */
+const SIDE_OPEN: [number, number] = [0, 0.55];
+
+/**
+ * The raised lane dividers of a turbo roundabout, as runs of points. One per main arm: round the outside of the
+ * lane that arm starts, from just past its entry (the left entry lane crosses the lane carrying on past the arm,
+ * so the divider cannot reach back to the entry) to between the exit lanes of the opposite main arm, and open
+ * where a side road's left lane crosses to the inner lane.
+ */
+export const turboDividers = (layout: Layout): Vector3[][] => {
+  const mains = turboMains(layout);
+  const sides = layout.arms.filter((arm) => !mains.includes(arm));
+  return mains.flatMap((main) => {
+    const opposite = mains.find((m) => m !== main)!;
+    const start = armAngle(main);
+    const radiusAt = (angle: number) => turboLaneRadius(mod(angle - start, TWO_PI)) + TURBO_TRACK / 2;
+    const route = ringRoute(main, LANE_WIDTH, opposite, -LANE_WIDTH, radiusAt, TURBO_GROWTH, TURBO_EDGE, TURBO_EDGE);
+    const open = (p: Vector3) => {
+      const angle = planAngle(p);
+      if (mod(angle - start, TWO_PI) < DIVIDER_START) return true;
+      return sides.some((side) => mod(angle - armAngle(side) - SIDE_OPEN[0], TWO_PI) < SIDE_OPEN[1] - SIDE_OPEN[0]);
+    };
+    const runs: Vector3[][] = [[]];
+    for (const p of route.getSpacedPoints(260)) {
+      if (open(p)) runs.push([]);
+      else runs[runs.length - 1]!.push(p);
+    }
+    return runs.filter((run) => run.length > 1);
+  });
 };
 
 /** A Variant: the same Layout turned clockwise by `degrees`. Never mirrored, since that swaps left and right. */

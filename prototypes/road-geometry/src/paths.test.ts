@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Vector3 } from 'three';
-import { ISLAND_RADIUS, manoeuvrePath, rotateLayout, type Layout } from './layout';
+import { ISLAND_RADIUS, manoeuvrePath, rotateLayout, turboDividers, turboInnerPhi, turboLaneRadius, TURBO_LANE, type Layout } from './layout';
 
 // Scene coordinates are three.js: x = east, y = up, z = south.
 // Tests read positions back as [east, north] metres, rounded to 0.01.
@@ -130,5 +130,57 @@ describe('manoeuvrePath on a roundabout', () => {
     const path = manoeuvrePath(roundabout, { id: 'car', kind: 'car', arm: 's', manoeuvre: 'right' });
     expect(plan(path.getPointAt(1))).toEqual([30, -1.75]);
     expect(samples(path).every(([, n]) => n! < 0)).toBe(true);
+  });
+});
+
+describe('manoeuvrePath on a turbo roundabout', () => {
+  const turbo: Layout = {
+    kind: 'roundabout',
+    turbo: true,
+    arms: [0, 90, 180, 270].map((bearing, i) => ({ id: 'nesw'[i]!, bearing, lanesIn: 2, lanesOut: bearing % 180 === 0 ? 2 : 1 })),
+  };
+  const radiusAtEast = (path: ReturnType<typeof manoeuvrePath>) => {
+    const p = path.getSpacedPoints(400).find((q) => q.x > 0 && Math.abs(q.z) < 0.5)!;
+    return p.length();
+  };
+
+  it('keeps the left entry lane inside the right one', () => {
+    const left = manoeuvrePath(turbo, { id: 'a', kind: 'car', arm: 's', manoeuvre: 'straight', lane: 1 });
+    const right = manoeuvrePath(turbo, { id: 'b', kind: 'car', arm: 's', manoeuvre: 'straight' });
+    expect(radiusAtEast(left) + 3).toBeLessThan(radiusAtEast(right));
+  });
+
+  it('leaves a main arm by the left exit lane from the inner ring lane, and by the right one from the outer', () => {
+    const end = (lane: number) => manoeuvrePath(turbo, { id: 'a', kind: 'car', arm: 's', manoeuvre: 'straight', lane }).getPoint(1);
+    // Leaving north, heading north: the right exit lane is further east.
+    expect(end(0).x).toBeGreaterThan(end(1).x + 3);
+  });
+
+  it('keeps every allowed manoeuvre in its lane: clear of the island and the lane dividers', () => {
+    const dividers = turboDividers(turbo).flat();
+    for (const arm of turbo.arms) {
+      for (const manoeuvre of ['left', 'straight', 'right'] as const) {
+        for (const lane of [0, 1]) {
+          let path;
+          try {
+            path = manoeuvrePath(turbo, { id: 'a', kind: 'car', arm: arm.id, manoeuvre, lane });
+          } catch {
+            continue;
+          }
+          for (const p of path.getSpacedPoints(300)) {
+            const island = turboLaneRadius(turboInnerPhi(turbo, Math.atan2(-p.z, p.x))) - TURBO_LANE / 2;
+            expect(p.length() - island).toBeGreaterThan(1.5);
+            expect(Math.min(...dividers.map((d) => d.distanceTo(p)))).toBeGreaterThan(1.5);
+          }
+        }
+      }
+    }
+  });
+
+  it('refuses a manoeuvre the lane cannot make', () => {
+    expect(() => manoeuvrePath(turbo, { id: 'a', kind: 'car', arm: 's', manoeuvre: 'left' })).toThrow();
+    expect(() => manoeuvrePath(turbo, { id: 'a', kind: 'car', arm: 's', manoeuvre: 'right', lane: 1 })).toThrow();
+    expect(() => manoeuvrePath(turbo, { id: 'a', kind: 'car', arm: 'e', manoeuvre: 'straight' })).toThrow();
+    expect(() => manoeuvrePath(turbo, { id: 'a', kind: 'car', arm: 'e', manoeuvre: 'right', lane: 1 })).toThrow();
   });
 });

@@ -1,4 +1,4 @@
-import type { Layout, RoadUser } from '../layout';
+import type { Control, Layout, RoadUser } from '../layout';
 
 /** A prototype Scenario: the Passing order and Explanations are written by hand (no rules engine yet). */
 export type Scenario = {
@@ -16,10 +16,19 @@ export type Scenario = {
 const compass = (extra: Partial<Layout['arms'][number]> = {}) =>
   [0, 90, 180, 270].map((bearing, i) => ({ id: 'nesw'[i]!, bearing, ...extra }));
 
-/** A turbo roundabout: two lanes on every approach, B6 at every entry. The ring itself is drawn single-lane. */
-const turbo = (): Layout => ({
+/**
+ * A turbo roundabout with the main road north–south: two lanes in on every arm, two lanes out on the main road
+ * and one on the side roads, B6 at every entry.
+ */
+const turbo = (control: Control = {}): Layout => ({
   kind: 'roundabout',
-  arms: compass().map((arm) => ({ ...arm, lanesIn: 2, control: { priority: 'B6' as const } })),
+  turbo: true,
+  arms: compass().map((arm) => ({
+    ...arm,
+    lanesIn: 2,
+    lanesOut: arm.id === 'n' || arm.id === 's' ? 2 : 1,
+    control: { priority: 'B6' as const, ...control },
+  })),
 });
 
 export const scenarios: Scenario[] = [
@@ -330,12 +339,12 @@ export const scenarios: Scenario[] = [
     layout: turbo(),
     roadUsers: [
       { id: 'car', kind: 'car', arm: 's', manoeuvre: 'straight', lane: 1 },
-      { id: 'circulating', kind: 'car', arm: 'w', manoeuvre: 'straight' },
+      { id: 'circulating', kind: 'car', arm: 'w', manoeuvre: 'left', lane: 1 },
     ],
     you: 'car',
     passingOrder: [['circulating'], ['car']],
     explanations: {
-      car: 'You chose the left lane for going straight on. The B6 sign still applies to both lanes: you wait for the car already on the roundabout (RVV art. 15, Bijlage 1).',
+      car: 'From the left lane you cross the outer ring lane to reach the inner one. The shark teeth (B6) apply to both lanes: give way to traffic in either ring lane, here the car passing your entry in the outer lane (RVV art. 15, Bijlage 1).',
     },
   },
   {
@@ -345,13 +354,27 @@ export const scenarios: Scenario[] = [
     roadUsers: [
       { id: 'right', kind: 'car', arm: 's', manoeuvre: 'right' },
       { id: 'left', kind: 'car', arm: 's', manoeuvre: 'straight', lane: 1 },
-      { id: 'circulating', kind: 'bus', arm: 'w', manoeuvre: 'straight' },
+      { id: 'circulating', kind: 'bus', arm: 'w', manoeuvre: 'straight', lane: 1 },
     ],
     you: 'right',
     passingOrder: [['circulating'], ['right', 'left']],
     explanations: {
-      right: 'Both lanes on your arm give way to the bus on the roundabout. Once it has passed, the two lanes are kept apart by the lane dividers and can enter side by side (RVV art. 15, Bijlage 1).',
-      left: 'You wait for the bus on the roundabout. Never switch lanes on a turbo roundabout: the lane you chose before the entry decides where you can exit.',
+      right: 'Both lanes on your arm give way to the bus on the roundabout (RVV art. 15, Bijlage 1). Once it has passed, the raised lane dividers keep the two lanes apart, so they can enter side by side.',
+      left: 'You wait for the bus on the roundabout. The lane you chose before the entry decides where you can go: the arrows show the left lane goes straight on or left, and the lane dividers stop you changing lanes.',
+    },
+  },
+  {
+    id: 'turbo-spiral',
+    title: 'Turbo roundabout: turning left',
+    layout: turbo(),
+    roadUsers: [
+      { id: 'car', kind: 'car', arm: 's', manoeuvre: 'left', lane: 1 },
+      { id: 'joining', kind: 'car', arm: 'n', manoeuvre: 'right' },
+    ],
+    you: 'car',
+    passingOrder: [['car'], ['joining']],
+    explanations: {
+      joining: 'Your inner lane spirals outward and becomes the outer lane past the north arm. The car joining from the right lane there merges into that lane, so it gives way to you: you are already on the roundabout (RVV art. 15, Bijlage 1).',
     },
   },
   {
@@ -360,21 +383,18 @@ export const scenarios: Scenario[] = [
     layout: turbo(),
     roadUsers: [
       { id: 'car', kind: 'car', arm: 's', manoeuvre: 'straight', lane: 1 },
-      { id: 'bus', kind: 'bus', arm: 'n', manoeuvre: 'left' },
+      { id: 'bus', kind: 'bus', arm: 'n', manoeuvre: 'left', lane: 1 },
     ],
     you: 'car',
     passingOrder: [['bus'], ['car']],
     explanations: {
-      car: 'The bus is taking the third exit and passes your entry on the way, so it is on the roundabout and goes first (RVV art. 15, Bijlage 1).',
+      car: 'The bus is turning left. Its lane has spiralled out to the outer lane by the time it passes your entry, and you cross that lane, so it is on the roundabout and goes first (RVV art. 15, Bijlage 1).',
     },
   },
   {
     id: 'turbo-exit-zebra',
     title: 'Turbo roundabout: leaving at a zebra',
-    layout: {
-      kind: 'roundabout',
-      arms: compass().map((arm) => ({ ...arm, lanesIn: 2, control: { priority: 'B6' as const, zebra: true } })),
-    },
+    layout: turbo({ zebra: true }),
     roadUsers: [
       { id: 'car', kind: 'car', arm: 's', manoeuvre: 'right' },
       { id: 'ped', kind: 'pedestrian', arm: 'e', manoeuvre: 'cross' },

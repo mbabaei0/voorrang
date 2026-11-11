@@ -41,6 +41,13 @@ import {
   inEdge,
   outEdge,
   FOOTWAY_OFFSET,
+  TURBO_LANE,
+  armAngle,
+  isTurbo,
+  turboDividers,
+  turboLaneRadius,
+  turboMains,
+  turboOuterEdge,
   type Arm,
   type Layout,
   type LightState,
@@ -125,6 +132,7 @@ const mainRoad = (layout: Layout) => layout.arms.filter((arm) => !arm.exit);
  * uitrit starts at its carriageway edge, so the main road's cycle paths and footways run on across it.
  */
 const armStart = (layout: Layout, arm: Arm) => {
+  if (isTurbo(layout)) return turboLaneRadius(Math.PI) + TURBO_LANE / 2 - 0.2;
   if (layout.kind === 'roundabout') return ISLAND_RADIUS + RING_WIDTH - 0.2;
   if (layout.kind !== 'exit') return junctionRadius(layout);
   if (!arm.exit) return 0;
@@ -182,10 +190,53 @@ const rails = (arm: Arm, out: BufferGeometry[]) => {
   }
 };
 
-const markings = (arm: Arm, stop: number, out: BufferGeometry[]) => {
+/** A solid line along an arm, between two distances out. */
+const solid = (arm: Arm, from: number, to: number, side: number, out: BufferGeometry[]) =>
+  out.push(strip(arm, [from, to], [side - 0.07, side + 0.07], LAYER.markings, COLOURS.white));
+
+/**
+ * Lane arrows, built in a frame where x is to the right of inbound traffic and y points ahead, then laid on the
+ * lane with their tip `tip` metres out from the centre.
+ */
+type Turn = 'left' | 'straight' | 'right';
+const arrow = (arm: Arm, tip: number, side: number, turns: Turn[], out: BufferGeometry[]) => {
+  const shapes: [number, number][][] = [];
+  const fork = 2.2;
+  const top = turns.includes('straight') ? 3.6 : fork + 0.13;
+  shapes.push([[-0.12, 0], [0.12, 0], [0.12, top], [-0.12, top]]);
+  if (turns.includes('straight')) shapes.push([[-0.45, 3.6], [0.45, 3.6], [0, 5]]);
+  for (const turn of turns) {
+    if (turn === 'straight') continue;
+    const k = turn === 'right' ? 1 : -1;
+    shapes.push([[0, fork - 0.13], [k * 0.8, fork - 0.13], [k * 0.8, fork + 0.13], [0, fork + 0.13]]);
+    shapes.push([[k * 0.8, fork - 0.45], [k * 1.45, fork], [k * 0.8, fork + 0.45]]);
+  }
+  for (const shape of shapes) out.push(polygon(shape.map(([x, y]) => armPoint(arm, tip + 5 - y, side + x)), LAYER.markings, COLOURS.white));
+};
+
+/**
+ * Turbo roundabout lane markings. The lane line between the entry lanes, and between a main arm's exit lanes,
+ * is solid towards the ring (no changing lanes), and arrows show where each entry lane can go: on the main
+ * road the right lane goes right or straight on and the left lane straight on or left; from a side road the
+ * right lane only goes right.
+ */
+const turboMarkings = (layout: Layout, arm: Arm, stop: number, out: BufferGeometry[]) => {
+  const main = lanesOut(arm) === 2;
+  solid(arm, stop, stop + 12, LANE_WIDTH, out);
+  dashes(arm, stop + 13, LANE_WIDTH, out);
+  if (main) {
+    solid(arm, junctionEdge(layout) + 3, stop + 8, -LANE_WIDTH, out);
+    dashes(arm, stop + 9, -LANE_WIDTH, out);
+  }
+  arrow(arm, stop + 4, LANE_WIDTH * 1.5, main ? ['straight', 'right'] : ['right'], out);
+  arrow(arm, stop + 4, LANE_WIDTH * 0.5, ['straight', 'left'], out);
+};
+
+const markings = (layout: Layout, arm: Arm, stop: number, out: BufferGeometry[]) => {
   if (arm.exit) return;
   if (!arm.tram) dashes(arm, stop + 1, 0, out);
-  for (let lane = 1; lane < lanesIn(arm); lane++) dashes(arm, stop + 1, lane * LANE_WIDTH, out);
+  if (isTurbo(layout) && lanesIn(arm) === 2) turboMarkings(layout, arm, stop, out);
+  else for (let lane = 1; lane < lanesIn(arm); lane++) dashes(arm, stop + 1, lane * LANE_WIDTH, out);
   const control = arm.control;
   if (control?.lights || control?.priority === 'B7') {
     out.push(strip(arm, [stop, stop + 0.3], [0, lanesIn(arm) * LANE_WIDTH], LAYER.markings, COLOURS.white));
@@ -305,11 +356,12 @@ const street = (layout: Layout) => {
   for (const arm of layout.arms) {
     if (arm.exit) continue;
     const start = armStart(layout, arm);
-    const length = SURFACE_END - start;
     const [left, right] = carriageway(arm);
     for (const side of [left - 0.1, right + 0.1]) {
-      const at = armPoint(arm, start + length / 2, side);
-      parts.push(standAt(paint(new BoxGeometry(0.2, 0.14, length), COLOURS.kerb), arm, at, 0.07));
+      const from = isTurbo(layout) ? turboKerbStart(layout, arm, side, start) : start;
+      const run = SURFACE_END - from;
+      const at = armPoint(arm, from + run / 2, side);
+      parts.push(standAt(paint(new BoxGeometry(0.2, 0.14, run), COLOURS.kerb), arm, at, 0.07));
     }
     // A lamp every 16 m on the far verge, its head reaching over the road.
     for (let d = Math.max(start, junctionEdge(layout)) + 7; d < ARM_LENGTH + 6; d += 16) {
@@ -418,7 +470,14 @@ const corners = (layout: Layout) => {
 /** Roundabout details: a cobbled apron and kerb round the island, and splitter islands on the arms. */
 const roundaboutDetails = (layout: Layout) => {
   const parts: BufferGeometry[] = [];
-  if (layout.kind === 'roundabout') {
+  if (isTurbo(layout)) {
+    for (const arm of layout.arms) {
+      if (arm.tram) continue;
+      const at = armPoint(arm, 21.2, 0);
+      parts.push(standAt(paint(new BoxGeometry(1.1, 0.14, 9), COLOURS.kerb), arm, at, 0.07));
+      parts.push(standAt(paint(new BoxGeometry(0.8, 0.16, 8.6), COLOURS.island), arm, at, 0.08));
+    }
+  } else if (layout.kind === 'roundabout') {
     parts.push(ring(ISLAND_RADIUS - 1.4, ISLAND_RADIUS, LAYER.footway, COLOURS.apron));
     parts.push(paint(new RingGeometry(ISLAND_RADIUS - 1.6, ISLAND_RADIUS - 1.4, 64).rotateX(-Math.PI / 2).translate(0, 0.08, 0), COLOURS.kerb));
     const ringOuter = ISLAND_RADIUS + RING_WIDTH;
@@ -430,6 +489,84 @@ const roundaboutDetails = (layout: Layout) => {
     }
   }
   return mergedMesh(parts, 'roundabout');
+};
+
+// ---- Turbo roundabouts: a spiral island, a ring whose outside spirals with it, and raised lane dividers. ----
+
+/** A point at a plan angle (anticlockwise from east) and distance from the centre. */
+const polar = (angle: number, r: number) => new Vector3(r * Math.cos(angle), 0, -r * Math.sin(angle));
+const angleOf = (p: Vector3) => Math.atan2(-p.z, p.x);
+
+/**
+ * A closed outline round a turbo roundabout, in two halves, one from each main arm, at `radius(phi)` from the
+ * centre, where phi is how far round the inner lane is. It steps at each main arm, where a new lane begins.
+ */
+const turboOutline = (layout: Layout, radius: (phi: number) => number, steps = 72) =>
+  turboMains(layout).flatMap((main) =>
+    Array.from({ length: steps + 1 }, (_, j) => {
+      const phi = (Math.PI * j) / steps;
+      return polar(armAngle(main) + phi, radius(phi));
+    }),
+  );
+
+const turboGround = (layout: Layout) => [
+  polygon(turboOutline(layout, (phi) => turboLaneRadius(phi + Math.PI) + TURBO_LANE / 2), LAYER.road, COLOURS.asphalt),
+  // A paved island, planted in the middle.
+  polygon(turboOutline(layout, (phi) => turboLaneRadius(phi) - TURBO_LANE / 2), LAYER.footway, COLOURS.apron),
+  polygon(turboOutline(layout, (phi) => turboLaneRadius(phi) - TURBO_LANE / 2 - 1.4), LAYER.cyclePath, COLOURS.island),
+];
+
+/** A raised kerb along a line of points, as one box per segment. */
+const kerbLine = (points: Vector3[], width: number, height: number, colour: number, out: BufferGeometry[]) => {
+  for (let i = 0; i + 1 < points.length; i++) {
+    const p = points[i]!;
+    const q = points[i + 1]!;
+    const length = p.distanceTo(q);
+    if (length < 1e-3) continue;
+    const mid = p.clone().add(q).multiplyScalar(0.5);
+    const box = new BoxGeometry(width, height, length + width * 0.6);
+    out.push(paint(box.rotateY(Math.atan2(q.x - p.x, q.z - p.z)).translate(mid.x, height / 2, mid.z), colour));
+  }
+};
+
+/** Split a line of points into runs, leaving out the points `skip` picks. */
+const runs = (points: Vector3[], skip: (p: Vector3) => boolean) =>
+  points.reduce<Vector3[][]>((all, p) => {
+    if (skip(p)) all.push([]);
+    else all[all.length - 1]!.push(p);
+    return all;
+  }, [[]]);
+
+/** Whether a point lies in an arm's mouth: on its carriageway, out from the centre. */
+const inMouth = (arm: Arm, p: Vector3, margin: number) => {
+  const along = p.dot(armPoint(arm, 1, 0));
+  const side = p.dot(armPoint(arm, 0, 1));
+  const [left, right] = carriageway(arm);
+  return along > 0 && side > left - margin && side < right + margin;
+};
+
+/** Where a kerb `side` metres right of an arm's inbound traffic meets the outside of a turbo ring. */
+const turboKerbStart = (layout: Layout, arm: Arm, side: number, from: number) => {
+  for (let along = from; along < SURFACE_END; along += 0.1) {
+    const p = armPoint(arm, along, side);
+    if (p.length() >= turboOuterEdge(layout, angleOf(p))) return along;
+  }
+  return from;
+};
+
+/** Kerbs round the island and the outside of the ring, and the white raised lane dividers. */
+const turboKerbs = (layout: Layout) => {
+  const parts: BufferGeometry[] = [];
+  if (isTurbo(layout)) {
+    const island = turboOutline(layout, (phi) => turboLaneRadius(phi) - TURBO_LANE / 2);
+    kerbLine([...island, island[0]!], 0.25, 0.16, COLOURS.kerb, parts);
+    const outside = turboOutline(layout, (phi) => turboLaneRadius(phi + Math.PI) + TURBO_LANE / 2 + 0.1);
+    for (const run of runs([...outside, outside[0]!], (p) => layout.arms.some((arm) => inMouth(arm, p, 0.3)))) {
+      kerbLine(run, 0.2, 0.14, COLOURS.kerb, parts);
+    }
+    for (const run of turboDividers(layout)) kerbLine(run, 0.35, 0.12, COLOURS.white, parts);
+  }
+  return mergedMesh(parts, 'turbo');
 };
 
 // ---- Meshes. ----
@@ -490,7 +627,9 @@ export const buildScene = (layout: Layout, roadUsers: RoadUser[] = []): Group =>
   const ground: BufferGeometry[] = [paint(layFlat(new PlaneGeometry(2 * SURFACE_END, 2 * SURFACE_END), LAYER.grass), COLOURS.grass)];
   const lines: BufferGeometry[] = [];
 
-  if (layout.kind === 'roundabout') {
+  if (isTurbo(layout)) {
+    ground.push(...turboGround(layout));
+  } else if (layout.kind === 'roundabout') {
     ground.push(paint(layFlat(new CircleGeometry(ISLAND_RADIUS, 48), LAYER.road), COLOURS.island));
     ground.push(ring(ISLAND_RADIUS, ISLAND_RADIUS + RING_WIDTH, LAYER.road, COLOURS.asphalt));
     if (hasCycleRing(layout)) {
@@ -502,7 +641,7 @@ export const buildScene = (layout: Layout, roadUsers: RoadUser[] = []): Group =>
 
   for (const arm of layout.arms) {
     armSurface(layout, arm, ground);
-    markings(arm, stop, lines);
+    markings(layout, arm, stop, lines);
     if (arm.tram) rails(arm, lines);
   }
 
@@ -517,13 +656,14 @@ export const buildScene = (layout: Layout, roadUsers: RoadUser[] = []): Group =>
     street(layout),
     corners(layout),
     roundaboutDetails(layout),
+    turboKerbs(layout),
     signs(layout, stop),
     lights(layout, stop),
     scenery(layout),
     ...roadUsers.map((user, i) => roadUserMesh(layout, user, colours.get(user.id)!, i)),
   );
-  for (const name of ['ground', 'markings', 'zebra', 'haaientanden', 'corners', 'roundabout']) group.getObjectByName(name)!.receiveShadow = true;
-  for (const name of ['signs', 'lights', 'street']) group.getObjectByName(name)!.castShadow = true;
+  for (const name of ['ground', 'markings', 'zebra', 'haaientanden', 'corners', 'roundabout', 'turbo']) group.getObjectByName(name)!.receiveShadow = true;
+  for (const name of ['signs', 'lights', 'street', 'turbo']) group.getObjectByName(name)!.castShadow = true;
   group.getObjectByName('street')!.receiveShadow = true;
   return group;
 };
