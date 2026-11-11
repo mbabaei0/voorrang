@@ -48,6 +48,7 @@
             Who goes first at a Dutch junction, in plain language. The topics are in the order we suggest learning them, and each
             one names the article of the RVV 1990 it comes from.
           </p>
+          <p class="t-muted"><abbr title="Reglement verkeersregels en verkeerstekens 1990" lang="nl">RVV</abbr> is the Dutch traffic code, the <span lang="nl">Reglement verkeersregels en verkeerstekens</span>. “Art.” is short for article.</p>
           <p class="t-muted">The crossroads here is the first rule in action: traffic from the right goes first, bikes included.</p>
         </div>
         <div class="board" data-demo></div>
@@ -55,7 +56,7 @@
 
       <div class="rules-layout">
         <nav class="toc" aria-label="On this page">
-          <h2>On this page</h2>
+          <h2 class="toc-title">On this page</h2>
           <ol>
             <li><a href="#ladder"><span class="n"></span>What beats what</a></li>
             <li><a href="#duties"><span class="n"></span>Two kinds of giving way</a></li>
@@ -172,6 +173,20 @@
               <li>When the lights are off or flash yellow, the signs and haaientanden decide. Without those, the general rules apply.</li>
             </ul>
             <p class="t-cite">RVV art. 64, 68 and 75</p>
+            <dl class="cites" aria-label="What these articles say">
+              <div>
+                <dt>Art. 64</dt>
+                <dd>Traffic lights beat signs that regulate priority. This is why a working light overrules a give-way or priority sign.</dd>
+              </div>
+              <div>
+                <dt>Art. 68</dt>
+                <dd>What the three colours mean: green go, yellow stop (unless you are too close to stop safely), red stop. It also covers arrow lights, bicycle lights and the “right turn free” sign.</dd>
+              </div>
+              <div>
+                <dt>Art. 75</dt>
+                <dd>A flashing yellow light only warns of a danger. It gives nobody priority, so signs and the general rules decide.</dd>
+              </div>
+            </dl>
           </section>
 
           <section id="trams" aria-labelledby="trams-h">
@@ -248,5 +263,6 @@
       </div>
     </footer>
     <script type="module" src="/src/landing/demo.ts"></script>
+    <script type="module" src="/src/design/toc.ts"></script>
   </body>
 </html>
