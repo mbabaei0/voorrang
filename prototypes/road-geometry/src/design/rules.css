@@ -2,9 +2,22 @@
 
 .rules-hero {
   display: grid;
+  gap: var(--s-7);
+  align-items: center;
+  padding-block: var(--s-6) var(--s-8);
+}
+
+.rules-hero-copy {
+  display: grid;
   gap: var(--s-4);
-  padding-block: var(--s-6) var(--s-7);
   max-width: 46rem;
+}
+
+@media (min-width: 60rem) {
+  .rules-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--s-8);
+  }
 }
 
 .rules-hero .t-display {

@@ -129,7 +129,50 @@ function stopShort(from: Point, to: Point, gap: number): Point {
   return [to[0] - (dx / len) * gap, to[1] - (dy / len) * gap];
 }
 
+/** The board's markup: header, top-down crossroads and the sheet with the tray and actions. */
+const BOARD = `
+  <div class="board-head">
+    <h2>Try one here</h2>
+    <p>Unmarked crossroads</p>
+  </div>
+  <svg class="crossroads" viewBox="0 0 400 400" role="img" aria-label="Top view of a crossroads without signs or lights. A white car waits on the south arm, a cyclist on the east arm and a green car on the west arm. All three go straight on.">
+    <rect width="400" height="400" fill="var(--board-road)" />
+    <g fill="#7d8581">
+      <rect x="-40" y="-40" width="200" height="200" rx="26" />
+      <rect x="240" y="-40" width="200" height="200" rx="26" />
+      <rect x="-40" y="240" width="200" height="200" rx="26" />
+      <rect x="240" y="240" width="200" height="200" rx="26" />
+    </g>
+    <g fill="var(--board-verge)">
+      <rect x="-40" y="-40" width="188" height="188" rx="18" />
+      <rect x="252" y="-40" width="188" height="188" rx="18" />
+      <rect x="-40" y="252" width="188" height="188" rx="18" />
+      <rect x="252" y="252" width="188" height="188" rx="18" />
+    </g>
+    <g stroke="var(--board-line)" stroke-width="3" stroke-dasharray="14 12" opacity="0.8">
+      <path d="M200 0v148M200 252v148M0 200h148M252 200h148" />
+    </g>
+    <g class="users"></g>
+    <g class="conflict">
+      <circle class="pulse" r="18" fill="none" stroke="var(--signal)" stroke-width="4" />
+      <circle r="18" fill="none" stroke="var(--signal)" stroke-width="4" />
+      <path d="M-7-7 7 7M7-7-7 7" stroke="#fff" stroke-width="4" stroke-linecap="round" />
+    </g>
+    <g class="badges"></g>
+  </svg>
+  <div class="board-sheet">
+    <p class="prompt">Tap the road users in the order they may go. Tap again to take one back.</p>
+    <div class="result" role="status" aria-live="polite" hidden></div>
+    <div class="tray" role="group" aria-label="Road users"></div>
+    <div class="actions">
+      <button class="btn btn--action btn--small" type="button" data-action="check" disabled>Check order</button>
+      <button class="btn btn--quiet btn--small" type="button" data-action="clear" disabled>Clear</button>
+      <a href="puzzle.html">More puzzles</a>
+    </div>
+  </div>`;
+
 export function mountDemo(root: HTMLElement): void {
+  if (!root.children.length) root.innerHTML = BOARD;
   const svg = root.querySelector<SVGSVGElement>('svg.crossroads')!;
   const usersLayer = svg.querySelector<SVGGElement>('.users')!;
   const badgeLayer = svg.querySelector<SVGGElement>('.badges')!;
@@ -289,5 +332,4 @@ export function mountDemo(root: HTMLElement): void {
   render();
 }
 
-const root = document.querySelector<HTMLElement>('[data-demo]');
-if (root) mountDemo(root);
+for (const root of document.querySelectorAll<HTMLElement>('[data-demo]')) mountDemo(root);

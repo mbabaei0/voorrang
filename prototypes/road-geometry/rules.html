@@ -11,6 +11,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/src/design/system.css" />
+    <link rel="stylesheet" href="/src/design/board.css" />
     <link rel="stylesheet" href="/src/design/rules.css" />
   </head>
   <body>
@@ -40,11 +41,15 @@
 
     <main id="main" class="page">
       <div class="rules-hero">
-        <h1 class="t-display">The rules</h1>
-        <p class="t-lead">
-          Who goes first at a Dutch junction, in plain language. The topics are in the order we suggest learning them, and each one
-          names the article of the RVV 1990 it comes from.
-        </p>
+        <div class="rules-hero-copy">
+          <h1 class="t-display">The rules</h1>
+          <p class="t-lead">
+            Who goes first at a Dutch junction, in plain language. The topics are in the order we suggest learning them, and each
+            one names the article of the RVV 1990 it comes from.
+          </p>
+          <p class="t-muted">The crossroads here is the first rule in action: traffic from the right goes first, bikes included.</p>
+        </div>
+        <div class="board" data-demo></div>
       </div>
 
       <div class="rules-layout">
@@ -241,5 +246,6 @@
         </nav>
       </div>
     </footer>
+    <script type="module" src="/src/landing/demo.ts"></script>
   </body>
 </html>

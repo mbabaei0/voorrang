@@ -63,6 +63,7 @@ const COLOURS = {
   post: 0x8a8f96,
   housing: 0x1d1f22,
   kerb: 0xd6dad5,
+  apron: 0x9a948c,
   lamp: 0xfff3c4,
 };
 
@@ -325,6 +326,112 @@ const street = (layout: Layout) => {
   return mergedMesh(parts, 'street');
 };
 
+// ---- Junction corners: where neighbouring arms' cycle paths, verges and footways meet. ----
+
+/** Where two lines meet in the ground plane, or null when they are (nearly) parallel. */
+const meetLines = (p: Vector3, d: Vector3, q: Vector3, e: Vector3): Vector3 | null => {
+  const det = d.x * e.z - d.z * e.x;
+  if (Math.abs(det) < 1e-6) return null;
+  const t = ((q.x - p.x) * e.z - (q.z - p.z) * e.x) / det;
+  return p.clone().addScaledVector(d, t);
+};
+
+/** The line along an arm at a signed side offset: a point and a direction. */
+const armLine = (arm: Arm, side: number): [Vector3, Vector3] => {
+  const p = armPoint(arm, 0, side);
+  return [p, armPoint(arm, 1, side).sub(p)];
+};
+
+/** How far out along an arm a point lies. */
+const alongArm = (arm: Arm, p: Vector3) => p.dot(armPoint(arm, 1, 0));
+
+/** A band beside an arm, as [near, far] offsets from its centreline on one side. */
+type Band = [number, number];
+
+/** Clockwise gap from one arm's bearing to the next. */
+const gap = (a: Arm, b: Arm) => (((b.bearing - a.bearing) % 360) + 360) % 360 || 360;
+
+/**
+ * Join a band on the left of arm `a` (its outbound side) to the same band on the right of the next arm `b`
+ * clockwise. Bands that meet at an angle get a corner patch where they cross plus strips back to the arms; on
+ * a straight run (a T-junction's through road) the band simply carries on across.
+ */
+const joinBands = (a: Arm, b: Arm, bandA: Band, bandB: Band, radius: number, y: number, colour: number, out: BufferGeometry[]) => {
+  if (gap(a, b) > 165) {
+    out.push(polygon([armPoint(a, radius, -bandA[0]), armPoint(a, radius, -bandA[1]), armPoint(b, radius, bandB[1]), armPoint(b, radius, bandB[0])], y, colour));
+    return;
+  }
+  const corner = (sa: number, sb: number) => meetLines(...armLine(a, -sa), ...armLine(b, sb));
+  const pts = [corner(bandA[0], bandB[0]), corner(bandA[0], bandB[1]), corner(bandA[1], bandB[1]), corner(bandA[1], bandB[0])];
+  if (pts.some((p) => !p)) return;
+  const quad = pts as Vector3[];
+  out.push(polygon(quad, y, colour));
+  const reachA = Math.min(...quad.map((p) => alongArm(a, p)));
+  const reachB = Math.min(...quad.map((p) => alongArm(b, p)));
+  if (reachA < radius) out.push(strip(a, [reachA, radius], [-bandA[1], -bandA[0]], y, colour));
+  if (reachB < radius) out.push(strip(b, [reachB, radius], [bandB[0], bandB[1]], y, colour));
+};
+
+/** Dutch block markings: 0.5 m squares with 0.5 m gaps along a line on an arm, between two distances. */
+const blocks = (arm: Arm, side: number, from: number, to: number, out: BufferGeometry[]) => {
+  const [lo, hi] = from < to ? [from, to] : [to, from];
+  for (let a = lo + 0.25; a + 0.5 <= hi; a += 1) out.push(strip(arm, [a, a + 0.5], [side - 0.25, side + 0.25], LAYER.markings, COLOURS.white));
+};
+
+const corners = (layout: Layout) => {
+  const parts: BufferGeometry[] = [];
+  if (layout.kind === 'roundabout' || layout.kind === 'exit') return mergedMesh(parts, 'corners');
+  const radius = junctionRadius(layout);
+  const sorted = [...layout.arms].sort((x, y) => x.bearing - y.bearing);
+  const carriage = (arm: Arm, side: 'in' | 'out') => (side === 'in' ? lanesIn(arm) : lanesOut(arm)) * LANE_WIDTH;
+  const edge = (arm: Arm, side: 'in' | 'out') => (side === 'in' ? inEdge(arm) : outEdge(arm));
+  const footway = (arm: Arm, side: 'in' | 'out'): Band => [edge(arm, side) + FOOTWAY_OFFSET - FOOTWAY_WIDTH / 2, edge(arm, side) + FOOTWAY_OFFSET + FOOTWAY_WIDTH / 2];
+  const cycle = (arm: Arm, side: 'in' | 'out'): Band => [carriage(arm, side) + VERGE_WIDTH, carriage(arm, side) + VERGE_WIDTH + CYCLE_PATH_WIDTH];
+  const verge = (arm: Arm, side: 'in' | 'out'): Band => [carriage(arm, side), carriage(arm, side) + VERGE_WIDTH];
+
+  sorted.forEach((a, i) => {
+    const b = sorted[(i + 1) % sorted.length]!;
+    if (a === b) return;
+    joinBands(a, b, footway(a, 'out'), footway(b, 'in'), radius, LAYER.footway, COLOURS.footway, parts);
+    if (a.cyclePath && b.cyclePath) {
+      joinBands(a, b, verge(a, 'out'), verge(b, 'in'), radius, LAYER.footway, COLOURS.grass, parts);
+      joinBands(a, b, cycle(a, 'out'), cycle(b, 'in'), radius, LAYER.cyclePath, COLOURS.cyclePath, parts);
+    }
+  });
+
+  // Where a cycle path runs straight on across a side road, block markings show the crossing.
+  sorted.forEach((side, i) => {
+    const before = sorted[(i - 1 + sorted.length) % sorted.length]!;
+    const after = sorted[(i + 1) % sorted.length]!;
+    if (!before.cyclePath || !after.cyclePath || !side.cyclePath) return;
+    if (Math.abs(gap(before, after) - 180) > 5) return;
+    // `before`'s outbound-side cycle path carries on to `after`'s inbound side, across `side`'s mouth.
+    const [near, far] = cycle(before, 'out');
+    const sideBand = verge(side, 'in')[0];
+    const reach = Math.max(sideBand, verge(side, 'out')[0]) + VERGE_WIDTH;
+    for (const offset of [near, far]) blocks(before, -offset, reach, -reach, parts);
+  });
+
+  return mergedMesh(parts, 'corners');
+};
+
+/** Roundabout details: a cobbled apron and kerb round the island, and splitter islands on the arms. */
+const roundaboutDetails = (layout: Layout) => {
+  const parts: BufferGeometry[] = [];
+  if (layout.kind === 'roundabout') {
+    parts.push(ring(ISLAND_RADIUS - 1.4, ISLAND_RADIUS, LAYER.footway, COLOURS.apron));
+    parts.push(paint(new RingGeometry(ISLAND_RADIUS - 1.6, ISLAND_RADIUS - 1.4, 64).rotateX(-Math.PI / 2).translate(0, 0.08, 0), COLOURS.kerb));
+    const ringOuter = ISLAND_RADIUS + RING_WIDTH;
+    for (const arm of layout.arms) {
+      if (arm.tram) continue;
+      const at = armPoint(arm, ringOuter + 4.5, 0);
+      parts.push(standAt(paint(new BoxGeometry(1.1, 0.14, 8), COLOURS.kerb), arm, at, 0.07));
+      parts.push(standAt(paint(new BoxGeometry(0.8, 0.16, 7.6), COLOURS.island), arm, at, 0.08));
+    }
+  }
+  return mergedMesh(parts, 'roundabout');
+};
+
 // ---- Meshes. ----
 
 let shared: MeshLambertMaterial | undefined;
@@ -408,12 +515,14 @@ export const buildScene = (layout: Layout, roadUsers: RoadUser[] = []): Group =>
     zebra(layout),
     teeth(layout, stop),
     street(layout),
+    corners(layout),
+    roundaboutDetails(layout),
     signs(layout, stop),
     lights(layout, stop),
     scenery(layout),
     ...roadUsers.map((user, i) => roadUserMesh(layout, user, colours.get(user.id)!, i)),
   );
-  for (const name of ['ground', 'markings', 'zebra', 'haaientanden']) group.getObjectByName(name)!.receiveShadow = true;
+  for (const name of ['ground', 'markings', 'zebra', 'haaientanden', 'corners', 'roundabout']) group.getObjectByName(name)!.receiveShadow = true;
   for (const name of ['signs', 'lights', 'street']) group.getObjectByName(name)!.castShadow = true;
   group.getObjectByName('street')!.receiveShadow = true;
   return group;
