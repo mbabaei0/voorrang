@@ -16,6 +16,12 @@ export type Scenario = {
 const compass = (extra: Partial<Layout['arms'][number]> = {}) =>
   [0, 90, 180, 270].map((bearing, i) => ({ id: 'nesw'[i]!, bearing, ...extra }));
 
+/** A turbo roundabout: two lanes on every approach, B6 at every entry. The ring itself is drawn single-lane. */
+const turbo = (): Layout => ({
+  kind: 'roundabout',
+  arms: compass().map((arm) => ({ ...arm, lanesIn: 2, control: { priority: 'B6' as const } })),
+});
+
 export const scenarios: Scenario[] = [
   {
     id: 'turning-right',
@@ -316,6 +322,67 @@ export const scenarios: Scenario[] = [
     passingOrder: [['bike', 'ped'], ['car']],
     explanations: {
       car: 'Turning left, you let the oncoming cyclist and the pedestrian crossing the road you turn into go first (RVV art. 18).',
+    },
+  },
+  {
+    id: 'turbo-left-lane',
+    title: 'Turbo roundabout: left lane',
+    layout: turbo(),
+    roadUsers: [
+      { id: 'car', kind: 'car', arm: 's', manoeuvre: 'straight', lane: 1 },
+      { id: 'circulating', kind: 'car', arm: 'w', manoeuvre: 'straight' },
+    ],
+    you: 'car',
+    passingOrder: [['circulating'], ['car']],
+    explanations: {
+      car: 'You chose the left lane for going straight on. The B6 sign still applies to both lanes: you wait for the car already on the roundabout (RVV art. 15, Bijlage 1).',
+    },
+  },
+  {
+    id: 'turbo-two-lanes',
+    title: 'Turbo roundabout: two lanes entering',
+    layout: turbo(),
+    roadUsers: [
+      { id: 'right', kind: 'car', arm: 's', manoeuvre: 'right' },
+      { id: 'left', kind: 'car', arm: 's', manoeuvre: 'straight', lane: 1 },
+      { id: 'circulating', kind: 'bus', arm: 'w', manoeuvre: 'straight' },
+    ],
+    you: 'right',
+    passingOrder: [['circulating'], ['right', 'left']],
+    explanations: {
+      right: 'Both lanes on your arm give way to the bus on the roundabout. Once it has passed, the two lanes are kept apart by the lane dividers and can enter side by side (RVV art. 15, Bijlage 1).',
+      left: 'You wait for the bus on the roundabout. Never switch lanes on a turbo roundabout: the lane you chose before the entry decides where you can exit.',
+    },
+  },
+  {
+    id: 'turbo-long-way-round',
+    title: 'Turbo roundabout: third exit',
+    layout: turbo(),
+    roadUsers: [
+      { id: 'car', kind: 'car', arm: 's', manoeuvre: 'straight', lane: 1 },
+      { id: 'bus', kind: 'bus', arm: 'n', manoeuvre: 'left' },
+    ],
+    you: 'car',
+    passingOrder: [['bus'], ['car']],
+    explanations: {
+      car: 'The bus is taking the third exit and passes your entry on the way, so it is on the roundabout and goes first (RVV art. 15, Bijlage 1).',
+    },
+  },
+  {
+    id: 'turbo-exit-zebra',
+    title: 'Turbo roundabout: leaving at a zebra',
+    layout: {
+      kind: 'roundabout',
+      arms: compass().map((arm) => ({ ...arm, lanesIn: 2, control: { priority: 'B6' as const, zebra: true } })),
+    },
+    roadUsers: [
+      { id: 'car', kind: 'car', arm: 's', manoeuvre: 'right' },
+      { id: 'ped', kind: 'pedestrian', arm: 'e', manoeuvre: 'cross' },
+    ],
+    you: 'car',
+    passingOrder: [['ped'], ['car']],
+    explanations: {
+      car: 'Leaving the roundabout you reach a zebra crossing: stop and let the pedestrian cross before you drive on (RVV art. 49).',
     },
   },
 ];
