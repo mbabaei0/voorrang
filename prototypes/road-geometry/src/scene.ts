@@ -4,7 +4,6 @@ import {
   CircleGeometry,
   Color,
   DoubleSide,
-  Float32BufferAttribute,
   Group,
   InstancedMesh,
   Matrix4,
@@ -19,6 +18,7 @@ import {
   Vector3,
 } from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { ROAD_USER_SIZE, kindColour, paint, roadUserColours, roadUserGeometry, sceneryGeometry } from './models';
 import {
   ARM_LENGTH,
   CYCLE_PATH_WIDTH,
@@ -62,6 +62,8 @@ const COLOURS = {
   signYellow: 0xf5b301,
   post: 0x8a8f96,
   housing: 0x1d1f22,
+  kerb: 0xd6dad5,
+  lamp: 0xfff3c4,
 };
 
 const LAMPS: Record<'red' | 'yellow' | 'green', { lit: number; dark: number }> = {
@@ -70,32 +72,10 @@ const LAMPS: Record<'red' | 'yellow' | 'green', { lit: number; dark: number }> =
   green: { lit: 0x34c759, dark: 0x103a1c },
 };
 
-/** Road-user placeholders until the CC0 models are in: [width, height, length] in metres. */
-const ROAD_USERS: Record<RoadUserKind, { size: [number, number, number]; colour: number }> = {
-  car: { size: [1.8, 1.5, 4.2], colour: 0x3b82c4 },
-  bus: { size: [2.55, 3, 12], colour: 0xe2e2e2 },
-  tram: { size: [2.4, 3.2, 20], colour: 0xe8c547 },
-  voorrangsvoertuig: { size: [2.1, 2.5, 5.5], colour: 0xf5e663 },
-  bicycle: { size: [0.6, 1.6, 1.8], colour: 0x2f9e44 },
-  moped: { size: [0.7, 1.4, 1.9], colour: 0x8e44ad },
-  snorfiets: { size: [0.7, 1.4, 1.9], colour: 0xd9480f },
-  pedestrian: { size: [0.5, 1.75, 0.5], colour: 0xf08c00 },
-};
-
 /** Height of each layer above the grass, so coplanar surfaces don't fight. */
 const LAYER = { grass: -0.02, road: 0.01, footway: 0.012, cyclePath: 0.015, rails: 0.025, markings: 0.03 };
 
 // ---- Geometry helpers. Every static piece is non-indexed, with normals and vertex colours, so it can merge. ----
-
-const paint = (geometry: BufferGeometry, colour: number): BufferGeometry => {
-  const g = geometry.index ? geometry.toNonIndexed() : geometry;
-  g.deleteAttribute('uv');
-  g.computeVertexNormals();
-  const c = new Color(colour);
-  const count = g.getAttribute('position').count;
-  g.setAttribute('color', new Float32BufferAttribute(Array.from({ length: count }, () => [c.r, c.g, c.b]).flat(), 3));
-  return g;
-};
 
 /** Lay a flat geometry built in the XY plane (x = east, y = north) onto the ground at height `y`. */
 const layFlat = (geometry: BufferGeometry, y: number) => geometry.rotateX(-Math.PI / 2).translate(0, y, 0);
@@ -157,10 +137,13 @@ const footwayStart = (layout: Layout, arm: Arm) => {
   return armStart(layout, arm);
 };
 
+/** Road surfaces run on past the end of the arm to the edge of the ground, so roads don't stop in a field. */
+const SURFACE_END = ARM_LENGTH + 10;
+
 const armSurface = (layout: Layout, arm: Arm, out: BufferGeometry[]) => {
   const start = armStart(layout, arm);
   const colour = arm.exit ? COLOURS.brick : arm.surface === 'unpaved' ? COLOURS.unpaved : COLOURS.asphalt;
-  out.push(strip(arm, [start, ARM_LENGTH], carriageway(arm), LAYER.road, colour));
+  out.push(strip(arm, [start, SURFACE_END], carriageway(arm), LAYER.road, colour));
 
   const rightEdge = inEdge(arm);
   const leftEdge = outEdge(arm);
@@ -168,14 +151,14 @@ const armSurface = (layout: Layout, arm: Arm, out: BufferGeometry[]) => {
     const cycleStart = layout.kind === 'roundabout' ? CYCLE_RING_RADIUS : start;
     const inner = VERGE_WIDTH;
     const [left, right] = carriageway(arm);
-    out.push(strip(arm, [cycleStart, ARM_LENGTH], [right + inner, right + inner + CYCLE_PATH_WIDTH], LAYER.cyclePath, COLOURS.cyclePath));
-    out.push(strip(arm, [cycleStart, ARM_LENGTH], [left - inner - CYCLE_PATH_WIDTH, left - inner], LAYER.cyclePath, COLOURS.cyclePath));
+    out.push(strip(arm, [cycleStart, SURFACE_END], [right + inner, right + inner + CYCLE_PATH_WIDTH], LAYER.cyclePath, COLOURS.cyclePath));
+    out.push(strip(arm, [cycleStart, SURFACE_END], [left - inner - CYCLE_PATH_WIDTH, left - inner], LAYER.cyclePath, COLOURS.cyclePath));
   }
   const footStart = footwayStart(layout, arm);
   const footway = (edge: number): [number, number] => [edge + FOOTWAY_OFFSET - FOOTWAY_WIDTH / 2, edge + FOOTWAY_OFFSET + FOOTWAY_WIDTH / 2];
-  out.push(strip(arm, [footStart, ARM_LENGTH], footway(rightEdge), LAYER.footway, COLOURS.footway));
+  out.push(strip(arm, [footStart, SURFACE_END], footway(rightEdge), LAYER.footway, COLOURS.footway));
   const [near, far] = footway(leftEdge);
-  out.push(strip(arm, [footStart, ARM_LENGTH], [-far, -near], LAYER.footway, COLOURS.footway));
+  out.push(strip(arm, [footStart, SURFACE_END], [-far, -near], LAYER.footway, COLOURS.footway));
 };
 
 /** The junction square: a polygon through the corners where neighbouring arms' road surfaces meet it. */
@@ -315,6 +298,33 @@ const lights = (layout: Layout, stop: number) => {
   return mergedMesh(parts, 'lights');
 };
 
+/** Kerbstones along the carriageway and street lamps along the footways. */
+const street = (layout: Layout) => {
+  const parts: BufferGeometry[] = [];
+  for (const arm of layout.arms) {
+    if (arm.exit) continue;
+    const start = armStart(layout, arm);
+    const length = SURFACE_END - start;
+    const [left, right] = carriageway(arm);
+    for (const side of [left - 0.1, right + 0.1]) {
+      const at = armPoint(arm, start + length / 2, side);
+      parts.push(standAt(paint(new BoxGeometry(0.2, 0.14, length), COLOURS.kerb), arm, at, 0.07));
+    }
+    // A lamp every 16 m on the far verge, its head reaching over the road.
+    for (let d = Math.max(start, junctionEdge(layout)) + 7; d < ARM_LENGTH + 6; d += 16) {
+      const at = armPoint(arm, d, -(outEdge(arm) + FOOTWAY_OFFSET + 1.4));
+      const lamp = [
+        paint(new BoxGeometry(0.14, 5.2, 0.14).translate(0, 2.6, 0), COLOURS.post),
+        paint(new BoxGeometry(1.8, 0.1, 0.12).translate(0.85, 5.15, 0), COLOURS.post),
+        paint(new BoxGeometry(0.55, 0.14, 0.32).translate(1.65, 5.05, 0), COLOURS.lamp),
+      ];
+      // Built reaching towards +X; turn it so it reaches over the road.
+      parts.push(...lamp.map((g) => g.rotateY(facingTraffic(arm)).translate(at.x, 0, at.z)));
+    }
+  }
+  return mergedMesh(parts, 'street');
+};
+
 // ---- Meshes. ----
 
 let shared: MeshLambertMaterial | undefined;
@@ -328,23 +338,24 @@ const mergedMesh = (parts: BufferGeometry[], name: string) => {
   return mesh;
 };
 
-const roadUserMaterials = new Map<RoadUserKind, MeshLambertMaterial>();
+let modelShared: MeshLambertMaterial | undefined;
+/** Road users and scenery: vertex colours, flat shaded for the low-poly toy look. */
+const modelMaterial = () => (modelShared ??= new MeshLambertMaterial({ vertexColors: true, flatShading: true }));
 
-export const roadUserLength = (kind: RoadUserKind) => ROAD_USERS[kind].size[2];
-export const roadUserHeight = (kind: RoadUserKind) => ROAD_USERS[kind].size[1];
-export const roadUserColour = (kind: RoadUserKind) => ROAD_USERS[kind].colour;
+export const roadUserLength = (kind: RoadUserKind) => ROAD_USER_SIZE[kind][2];
+export const roadUserHeight = (kind: RoadUserKind) => ROAD_USER_SIZE[kind][1];
+export const roadUserColour = (kind: RoadUserKind) => kindColour(kind);
+export { roadUserColours };
 
 /** How far along its path a road user stands while it waits: just behind the stop line, or at the kerb. */
 export const waitingDistance = (layout: Layout, user: RoadUser) =>
   user.manoeuvre === 'cross' ? 0 : Math.max(0, ARM_LENGTH - stopLineDistance(layout) - roadUserLength(user.kind) / 2 - 0.5);
 
-/** A placeholder box for a road user, waiting just before its stop line, facing along its path. */
-const roadUserMesh = (layout: Layout, user: RoadUser) => {
-  const { size, colour } = ROAD_USERS[user.kind];
-  const [width, height, length] = size;
-  let material = roadUserMaterials.get(user.kind);
-  if (!material) roadUserMaterials.set(user.kind, (material = new MeshLambertMaterial({ color: colour })));
-  const mesh = new Mesh(new BoxGeometry(width, height, length), material);
+/** A road user's model, waiting just before its stop line, facing along its path. */
+const roadUserMesh = (layout: Layout, user: RoadUser, colour: number, index: number) => {
+  const height = ROAD_USER_SIZE[user.kind][1];
+  const mesh = new Mesh(roadUserGeometry(user.kind, colour, index), modelMaterial());
+  mesh.castShadow = true;
   mesh.name = `roadUser:${user.id}`;
   mesh.userData.roadUserId = user.id;
 
@@ -356,10 +367,20 @@ const roadUserMesh = (layout: Layout, user: RoadUser) => {
   return mesh;
 };
 
+const scenery = (layout: Layout) => {
+  const geometry = sceneryGeometry(layout);
+  const mesh = new Mesh(geometry ?? new BufferGeometry(), modelMaterial());
+  mesh.name = 'scenery';
+  mesh.visible = !!geometry;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+};
+
 /** Build the 3D scene for a Layout and its road users. Lights and camera are the caller's. */
 export const buildScene = (layout: Layout, roadUsers: RoadUser[] = []): Group => {
   const stop = stopLineDistance(layout);
-  const ground: BufferGeometry[] = [paint(layFlat(new PlaneGeometry(2 * ARM_LENGTH + 20, 2 * ARM_LENGTH + 20), LAYER.grass), COLOURS.grass)];
+  const ground: BufferGeometry[] = [paint(layFlat(new PlaneGeometry(2 * SURFACE_END, 2 * SURFACE_END), LAYER.grass), COLOURS.grass)];
   const lines: BufferGeometry[] = [];
 
   if (layout.kind === 'roundabout') {
@@ -378,6 +399,7 @@ export const buildScene = (layout: Layout, roadUsers: RoadUser[] = []): Group =>
     if (arm.tram) rails(arm, lines);
   }
 
+  const colours = roadUserColours(roadUsers);
   const group = new Group();
   group.name = 'layout';
   group.add(
@@ -385,9 +407,14 @@ export const buildScene = (layout: Layout, roadUsers: RoadUser[] = []): Group =>
     mergedMesh(lines, 'markings'),
     zebra(layout),
     teeth(layout, stop),
+    street(layout),
     signs(layout, stop),
     lights(layout, stop),
-    ...roadUsers.map((user) => roadUserMesh(layout, user)),
+    scenery(layout),
+    ...roadUsers.map((user, i) => roadUserMesh(layout, user, colours.get(user.id)!, i)),
   );
+  for (const name of ['ground', 'markings', 'zebra', 'haaientanden']) group.getObjectByName(name)!.receiveShadow = true;
+  for (const name of ['signs', 'lights', 'street']) group.getObjectByName(name)!.castShadow = true;
+  group.getObjectByName('street')!.receiveShadow = true;
   return group;
 };

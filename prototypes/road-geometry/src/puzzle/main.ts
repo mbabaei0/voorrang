@@ -1,6 +1,7 @@
 import {
   BoxGeometry,
   Color,
+  PCFSoftShadowMap,
   DirectionalLight,
   Group,
   HemisphereLight,
@@ -19,7 +20,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { conflicts } from '../conflicts';
 import { manoeuvrePath, type RoadUserKind } from '../layout';
-import { buildScene, roadUserColour, roadUserHeight, roadUserLength, waitingDistance } from '../scene';
+import { buildScene, roadUserColours, roadUserHeight, roadUserLength, waitingDistance } from '../scene';
 import { emptyAnswer, fromSteps, move, score, steps, tap, toggleLink, type Answer, type Score } from './answer';
 import { scheduleReplay, type Replay, type WrongAnswer } from './replay';
 import { scenarios, type Scenario } from './scenarios';
@@ -55,9 +56,17 @@ const scene = new Scene();
 // The scene's backdrop follows the design tokens, so it matches the board in light and dark mode.
 const sceneBackground = () => new Color(getComputedStyle(document.documentElement).getPropertyValue('--surface-sunk').trim() || '#dde1dc');
 scene.background = sceneBackground();
-scene.add(new HemisphereLight(0xffffff, 0x667755, 2));
-const sun = new DirectionalLight(0xffffff, 1.5);
-sun.position.set(20, 40, 10);
+scene.add(new HemisphereLight(0xffffff, 0x8a9a80, 1.7));
+const sun = new DirectionalLight(0xffffff, 1.6);
+sun.position.set(22, 40, 14);
+// Soft shadows ground the toy models; the shadow camera covers the whole Layout.
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = PCFSoftShadowMap;
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 120 });
+sun.shadow.bias = -0.0005;
+sun.shadow.normalBias = 0.03;
 scene.add(sun);
 
 const camera = new PerspectiveCamera(50, 1, 0.5, 300);
@@ -176,7 +185,7 @@ const chip = (id: string, num?: number) => {
   el.type = 'button';
   el.className = `chip${num ? ' placed' : ''}`;
   el.dataset.id = id;
-  const colour = `#${roadUserColour(user(id).kind).toString(16).padStart(6, '0')}`;
+  const colour = `#${roadUserColours(scenario.roadUsers).get(id)!.toString(16).padStart(6, '0')}`;
   el.setAttribute('aria-pressed', String(!!num));
   el.innerHTML = `<span class="chip-slot" aria-hidden="true">${
     num
@@ -209,8 +218,7 @@ const renderTray = (stepIndex: Map<string, number>) => {
     if (inputMode() === 'tray') enableDrag(el, k);
     el.addEventListener('click', () => {
       if (dragged) return;
-      answer = tap(answer, id);
-      update();
+      tapRoadUser(id);
     });
     tray.append(el);
   });
@@ -222,8 +230,7 @@ const renderTray = (stepIndex: Map<string, number>) => {
       for (const u of rest) {
         const el = chip(u.id);
         el.onclick = () => {
-          answer = tap(answer, u.id);
-          update();
+          tapRoadUser(u.id);
         };
         pool.append(el);
       }
@@ -274,6 +281,38 @@ const enableDrag = (el: HTMLElement, from: number) => {
 
 // ---- Tapping road users in the scene. ----
 
+/** Road users hop when tapped, so the learner sees which one they picked. Start times by id. */
+const hops = new Map<string, number>();
+const HOP_MS = 380;
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+const tapRoadUser = (id: string) => {
+  answer = tap(answer, id);
+  if (!reducedMotion.matches) {
+    hops.set(id, performance.now());
+    loop();
+  }
+  update();
+};
+
+/** Advance hops; true while any is still in the air. */
+const stepHops = (now: number) => {
+  for (const [id, start] of hops) {
+    const mesh = meshes.get(id);
+    const u = scenario.roadUsers.find((r) => r.id === id);
+    if (!mesh || !u || phase === 'replaying') {
+      hops.delete(id);
+      continue;
+    }
+    const t = Math.min(1, (now - start) / HOP_MS);
+    // Smaller hops for big vehicles: a bus does not jump as high as a cyclist.
+    const lift = Math.sin(Math.PI * t) * Math.min(0.9, 2.4 / roadUserLength(u.kind) + 0.25);
+    mesh.position.y = roadUserHeight(u.kind) / 2 + lift;
+    if (t >= 1) hops.delete(id);
+  }
+  return hops.size > 0;
+};
+
 const raycaster = new Raycaster();
 let down: { x: number; y: number; t: number } | null = null;
 renderer.domElement.addEventListener('pointerdown', (e) => (down = { x: e.clientX, y: e.clientY, t: performance.now() }));
@@ -286,8 +325,7 @@ renderer.domElement.addEventListener('pointerup', (e) => {
   raycaster.setFromCamera(ndc, camera);
   const hit = raycaster.intersectObjects(proxies, false)[0];
   if (!hit) return;
-  answer = tap(answer, hit.object.userData.roadUserId as string);
-  update();
+  tapRoadUser(hit.object.userData.roadUserId as string);
 });
 
 // ---- Camera presets. ----
@@ -438,6 +476,8 @@ const frame = (now: number) => {
     if (k >= 1) tween = null;
     else busy = true;
   }
+
+  if (stepHops(now)) busy = true;
 
   if (phase === 'replaying' && replay) {
     let rate = speed();

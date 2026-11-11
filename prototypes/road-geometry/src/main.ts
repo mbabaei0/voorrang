@@ -1,6 +1,7 @@
 import {
   BufferGeometry,
   Color,
+  PCFSoftShadowMap,
   DirectionalLight,
   Group,
   HemisphereLight,
@@ -27,9 +28,17 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 const scene = new Scene();
 const sceneBackground = () => new Color(getComputedStyle(document.documentElement).getPropertyValue('--surface-sunk').trim() || '#dde1dc');
 scene.background = sceneBackground();
-scene.add(new HemisphereLight(0xffffff, 0x667755, 2));
-const sun = new DirectionalLight(0xffffff, 1.5);
-sun.position.set(20, 40, 10);
+scene.add(new HemisphereLight(0xffffff, 0x8a9a80, 1.7));
+const sun = new DirectionalLight(0xffffff, 1.6);
+sun.position.set(22, 40, 14);
+// Soft shadows ground the toy models; the shadow camera covers the whole Layout.
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = PCFSoftShadowMap;
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 120 });
+sun.shadow.bias = -0.0005;
+sun.shadow.normalBias = 0.03;
 scene.add(sun);
 
 const camera = new PerspectiveCamera(45, 1, 0.5, 300);

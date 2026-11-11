@@ -4,7 +4,8 @@ These are throwaway prototypes. They answer [ticket 0008](../../wayfinder/0008-p
 
 - `src/layout.ts`: Layout, Arm and Control types; `manoeuvrePath`, which turns a road user into a `CurvePath`; and `rotateLayout`, which makes Variants.
 - `src/conflicts.ts`: `conflicts`, which finds where road users' paths cross or merge.
-- `src/scene.ts`: `buildScene`, which builds a three.js `Group` from merged, vertex-coloured static meshes plus placeholder road users.
+- `src/scene.ts`: `buildScene`, which builds a three.js `Group` from merged, vertex-coloured static meshes (roads, kerbs, lamps, signs, lights) plus the road users and scenery.
+- `src/models.ts`: low-poly road users (car, bus, tram, ambulance, cyclist, scooter, pedestrian) and seeded scenery (terraced houses, trees, bushes). Each road user is one merged mesh, and all scenery is one more.
 - `src/main.ts` and `src/presets.ts`: a demo page that renders on demand. It has a preset picker, path and conflict overlays, and a live draw-call count.
 
 - `src/puzzle/answer.ts`: the learner's answer (tap, link, move) and `score` against the Passing order.
