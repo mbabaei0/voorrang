@@ -2,23 +2,189 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Road geometry prototype</title>
-    <style>
-      html, body { margin: 0; height: 100%; background: #dfe7ec; font: 14px/1.4 system-ui, sans-serif; }
-      canvas { display: block; width: 100%; height: 100%; touch-action: none; }
-      #hud { position: fixed; top: 8px; left: 8px; right: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
-        background: rgb(255 255 255 / 0.9); padding: 8px; border-radius: 8px; max-width: 640px; }
-      #stats { font-variant-numeric: tabular-nums; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Voorrang: who goes first?</title>
+    <meta name="description" content="Practise the Dutch priority rules (voorrangsregels) for the CBR theory exam with puzzles you solve by tapping road users in order." />
+    <meta name="theme-color" content="#e8ebe7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1f2225" media="(prefers-color-scheme: dark)" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/design/system.css" />
+    <link rel="stylesheet" href="/src/landing/landing.css" />
   </head>
   <body>
-    <div id="hud">
-      <select id="layout"></select>
-      <label><input type="checkbox" id="paths" checked /> paths</label>
-      <label><input type="checkbox" id="conflicts" checked /> conflicts</label>
-      <span id="stats"></span>
-    </div>
-    <script type="module" src="/src/main.ts"></script>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <symbol id="sign-priority" viewBox="0 0 40 40">
+        <path d="M20 1.5 38.5 20 20 38.5 1.5 20Z" fill="#fff" stroke="#2c3034" stroke-width="1.2" stroke-linejoin="round" />
+        <path d="M20 8 32 20 20 32 8 20Z" fill="#f5b301" />
+      </symbol>
+      <symbol id="sign-info" viewBox="0 0 40 40">
+        <rect x="1.5" y="1.5" width="37" height="37" rx="5" fill="#1c4f9c" stroke="#fff" stroke-width="1" />
+        <rect x="5" y="5" width="30" height="30" rx="3" fill="none" stroke="#fff" stroke-width="1.6" />
+        <circle cx="20" cy="13" r="2.6" fill="#fff" />
+        <rect x="17.6" y="18" width="4.8" height="11" rx="1" fill="#fff" />
+      </symbol>
+      <symbol id="brand-mark" viewBox="0 0 36 36">
+        <rect width="36" height="36" rx="7" style="fill: var(--ink)" />
+        <path d="M5 12h7.3l-3.65 10zM14.35 12h7.3L18 22zM23.7 12H31l-3.65 10z" style="fill: var(--bg)" />
+      </symbol>
+    </svg>
+
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="page site-header">
+      <a class="brand" href="./">
+        <svg class="brand-mark" aria-hidden="true"><use href="#brand-mark" /></svg>
+        Voorrang
+      </a>
+      <nav class="site-nav" aria-label="Main">
+        <a href="puzzle.html">Puzzle</a>
+        <a href="rules.html">Rules</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="page hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <h1 id="hero-title" class="t-display">Who goes first?</h1>
+          <p class="dutch" lang="nl">Wie gaat er eerst?</p>
+          <p class="t-lead">
+            Practise the Dutch priority rules the way the CBR theory exam asks about them: put the road users in order, then watch it
+            play out.
+          </p>
+          <div class="btn-row">
+            <a class="btn btn--action" href="puzzle.html">
+              <svg class="sign" aria-hidden="true"><use href="#sign-priority" /></svg>
+              Start a puzzle
+            </a>
+            <a class="btn btn--guide" href="rules.html">
+              <svg class="sign" aria-hidden="true"><use href="#sign-info" /></svg>
+              Read the rules
+            </a>
+          </div>
+          <p class="aside">Free, with no account.</p>
+        </div>
+
+        <div class="board" data-demo>
+          <div class="board-head">
+            <h2>Try one here</h2>
+            <p>Unmarked crossroads</p>
+          </div>
+          <svg class="crossroads" viewBox="0 0 400 400" role="img" aria-label="Top view of a crossroads without signs or lights. A white car waits on the south arm, a cyclist on the east arm and a green car on the west arm. All three go straight on.">
+            <rect width="400" height="400" fill="var(--board-road)" />
+            <g fill="#7d8581">
+              <rect x="-40" y="-40" width="200" height="200" rx="26" />
+              <rect x="240" y="-40" width="200" height="200" rx="26" />
+              <rect x="-40" y="240" width="200" height="200" rx="26" />
+              <rect x="240" y="240" width="200" height="200" rx="26" />
+            </g>
+            <g fill="var(--board-verge)">
+              <rect x="-40" y="-40" width="188" height="188" rx="18" />
+              <rect x="252" y="-40" width="188" height="188" rx="18" />
+              <rect x="-40" y="252" width="188" height="188" rx="18" />
+              <rect x="252" y="252" width="188" height="188" rx="18" />
+            </g>
+            <g stroke="var(--board-line)" stroke-width="3" stroke-dasharray="14 12" opacity="0.8">
+              <path d="M200 0v148M200 252v148M0 200h148M252 200h148" />
+            </g>
+            <g class="users"></g>
+            <g class="conflict">
+              <circle class="pulse" r="18" fill="none" stroke="var(--signal)" stroke-width="4" />
+              <circle r="18" fill="none" stroke="var(--signal)" stroke-width="4" />
+              <path d="M-7-7 7 7M7-7-7 7" stroke="#fff" stroke-width="4" stroke-linecap="round" />
+            </g>
+            <g class="badges"></g>
+          </svg>
+          <div class="board-sheet">
+            <p class="prompt">Tap the road users in the order they may go. Tap again to take one back.</p>
+            <div class="result" role="status" aria-live="polite" hidden></div>
+            <div class="tray" role="group" aria-label="Road users"></div>
+            <div class="actions">
+              <button class="btn btn--action btn--small" type="button" data-action="check" disabled>Check order</button>
+              <button class="btn btn--quiet btn--small" type="button" data-action="clear" disabled>Clear</button>
+              <a href="puzzle.html">More puzzles</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="page"><div class="teeth" role="presentation"></div></div>
+
+      <section class="page ways" aria-labelledby="ways-title">
+        <div class="ways-intro">
+          <h2 id="ways-title" class="t-headline">Learn by doing, or read first</h2>
+        </div>
+        <div class="lanes">
+          <div class="lane">
+            <svg class="sign" aria-hidden="true"><use href="#sign-priority" /></svg>
+            <h3 class="t-title">Solve puzzles</h3>
+            <p>
+              Each puzzle is one junction in 3D: a crossroads, T-junction, roundabout or exit. Tap the road users in the order they
+              may go. The replay shows what happens, and a wrong order ends in the crash it would cause.
+            </p>
+            <div><a class="btn btn--action" href="puzzle.html">
+              <svg class="sign" aria-hidden="true"><use href="#sign-priority" /></svg>
+              Start a puzzle
+            </a></div>
+          </div>
+          <div class="lane-line" role="presentation"></div>
+          <div class="lane">
+            <svg class="sign" aria-hidden="true"><use href="#sign-info" /></svg>
+            <h3 class="t-title">Read the rules</h3>
+            <p>
+              The priority rules from the RVV 1990 in plain language, in the order we suggest learning them: from the right-hand rule
+              to trams, emergency vehicles and zebra crossings.
+            </p>
+            <div><a class="btn btn--guide" href="rules.html">
+              <svg class="sign" aria-hidden="true"><use href="#sign-info" /></svg>
+              Read the rules
+            </a></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page precedence" aria-labelledby="ladder-title">
+        <div class="precedence-intro">
+          <h2 id="ladder-title" class="t-headline">What beats what</h2>
+          <p>When a sign and a rule disagree, this order decides. The higher one always wins.</p>
+          <p><a href="rules.html#ladder">How the order works</a></p>
+        </div>
+        <ol class="ladder">
+          <li>
+            <h3>A traffic controller’s signal</h3>
+            <p>A police officer or traffic controller overrides lights, signs and rules.</p>
+            <span class="t-cite">RVV art. 84</span>
+          </li>
+          <li>
+            <h3>Traffic lights</h3>
+            <p>A working light overrides the priority signs at the same junction.</p>
+            <span class="t-cite">RVV art. 64</span>
+          </li>
+          <li>
+            <h3>Signs and road markings</h3>
+            <p>Give-way signs and haaientanden override the general rules.</p>
+            <span class="t-cite">RVV art. 63</span>
+          </li>
+          <li>
+            <h3>General rules</h3>
+            <p>Traffic from the right, turning, trams and special manoeuvres such as leaving an exit.</p>
+            <span class="t-cite">RVV chapter II</span>
+          </li>
+        </ol>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="page">
+        <p>A learning prototype, not affiliated with the CBR. The RVV 1990 is the official source.</p>
+        <nav aria-label="More">
+          <a href="design-system.html">Design system</a>
+          <a href="geometry.html">Road geometry demo</a>
+        </nav>
+      </div>
+    </footer>
+
+    <script type="module" src="/src/landing/demo.ts"></script>
   </body>
 </html>

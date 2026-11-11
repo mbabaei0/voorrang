@@ -1,0 +1,133 @@
+/*
+ * Voorrang design tokens.
+ *
+ * Every colour comes from Dutch road furniture, and each keeps the meaning
+ * its sign family has on the road:
+ *   priority (B1 voorrangsweg yellow)  → actions and the passing order
+ *   info     (blue L/G information signs) → guidance, links, the rules
+ *   signal   (red sign border)          → wrong answers and conflicts
+ *   asphalt / kerb / marking           → ink, page and surfaces
+ */
+:root {
+  color-scheme: light;
+
+  /* Base palette */
+  --asphalt: #2c3034;
+  --asphalt-2: #3b4045;
+  --kerb: #e8ebe7;
+  --kerb-2: #dde1dc;
+  --marking: #ffffff;
+  --priority: #f5b301;
+  --priority-deep: #d99a00;
+  --info: #1c4f9c;
+  --signal: #c4122f;
+  --verge: #a4b893;
+  --fietspad: #a9473d;
+
+  /* Roles */
+  --bg: var(--kerb);
+  --surface: var(--marking);
+  --surface-sunk: var(--kerb-2);
+  --ink: var(--asphalt);
+  --ink-muted: #565d63;
+  --line: #c9cfc9;
+  --link: var(--info);
+  --focus: var(--info);
+  --action: var(--priority);
+  --action-hover: #ffc21f;
+  --action-ink: var(--asphalt);
+  --guide: var(--info);
+  --guide-hover: #245fb6;
+  --guide-ink: #ffffff;
+  --good: #1d7a3a;
+  --good-bg: #dcefe0;
+  --bad: var(--signal);
+  --bad-bg: #f8e1e4;
+
+  /* Illustration (the crossroads board stays asphalt in both themes) */
+  --board: var(--asphalt);
+  --board-road: #464c52;
+  --board-verge: #5d6b55;
+  --board-line: #e9ece8;
+
+  /* Type: one family, Archivo; width does the work display vs text */
+  --font: 'Archivo', ui-sans-serif, system-ui, sans-serif;
+  --wdth-display: 62;
+  --wdth-text: 100;
+
+  /* Scale from The Elements of Typographic Style: 14 16 18 21 24 36 48 72 */
+  --step--1: 0.875rem;
+  --step-0: 1rem;
+  --step-1: 1.125rem;
+  --step-2: 1.3125rem;
+  --step-3: 1.5rem;
+  --step-4: 2.25rem;
+  --step-5: 3rem;
+  --step-6: 4.5rem;
+  --step-display: clamp(4.5rem, 3rem + 7vw, 9rem);
+
+  --leading-tight: 0.95;
+  --leading-heading: 1.1;
+  --leading-text: 1.55;
+  --measure: 66ch;
+
+  /* Space: 4px base */
+  --s-1: 0.25rem;
+  --s-2: 0.5rem;
+  --s-3: 0.75rem;
+  --s-4: 1rem;
+  --s-5: 1.5rem;
+  --s-6: 2rem;
+  --s-7: 3rem;
+  --s-8: 4.5rem;
+  --s-9: 6rem;
+
+  /* Radius: signs have softly rounded corners; the board is a larger object */
+  --r-sign: 6px;
+  --r-board: 22px;
+  --r-pill: 999px;
+
+  --gutter: clamp(1rem, 4vw, 3rem);
+  --page: 76rem;
+
+  --shadow-board: 0 1px 0 rgb(255 255 255 / 0.6) inset, 0 24px 48px -24px rgb(44 48 52 / 0.45);
+  --ease: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #1f2225;
+    --surface: #292d31;
+    --surface-sunk: #24272a;
+    --ink: #e8ebe7;
+    --ink-muted: #a6adb2;
+    --line: #3d4348;
+    --link: #8db4f0;
+    --focus: #8db4f0;
+    --good: #6fcf8c;
+    --good-bg: #1f3526;
+    --bad: #ff7a8a;
+    --bad-bg: #3d2228;
+    --board: #2f3438;
+    --shadow-board: 0 24px 48px -24px rgb(0 0 0 / 0.7);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #1f2225;
+  --surface: #292d31;
+  --surface-sunk: #24272a;
+  --ink: #e8ebe7;
+  --ink-muted: #a6adb2;
+  --line: #3d4348;
+  --link: #8db4f0;
+  --focus: #8db4f0;
+  --good: #6fcf8c;
+  --good-bg: #1f3526;
+  --bad: #ff7a8a;
+  --bad-bg: #3d2228;
+  --board: #2f3438;
+  --shadow-board: 0 24px 48px -24px rgb(0 0 0 / 0.7);
+}

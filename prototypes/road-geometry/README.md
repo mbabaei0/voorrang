@@ -1,6 +1,6 @@
 # Road geometry and puzzle prototypes (tickets 0008, 0006)
 
-These are throwaway prototypes. They answer [ticket 0008](../../wayfinder/0008-prototype-road-geometry.md) (`index.html`) and [ticket 0006](../../wayfinder/0006-prototype-puzzle-interaction.md) (`puzzle.html`); the findings are in each ticket's Resolution.
+These are throwaway prototypes. They answer [ticket 0008](../../wayfinder/0008-prototype-road-geometry.md) (`geometry.html`) and [ticket 0006](../../wayfinder/0006-prototype-puzzle-interaction.md) (`puzzle.html`); the findings are in each ticket's Resolution.
 
 - `src/layout.ts`: Layout, Arm and Control types; `manoeuvrePath`, which turns a road user into a `CurvePath`; and `rotateLayout`, which makes Variants.
 - `src/conflicts.ts`: `conflicts`, which finds where road users' paths cross or merge.
@@ -10,6 +10,12 @@ These are throwaway prototypes. They answer [ticket 0008](../../wayfinder/0008-p
 - `src/puzzle/answer.ts`: the learner's answer (tap, link, move) and `score` against the Passing order.
 - `src/puzzle/replay.ts`: `scheduleReplay`, which times each road user's Replay and stages the collision on a wrong answer.
 - `src/puzzle/scenarios.ts` and `src/puzzle/main.ts`: the puzzle page, with interaction variants under "Variants" or from the URL (`?input=tray&ties=links&speed=2&orbit=on`).
+
+The site around them:
+
+- `index.html`: the landing page, with one playable crossroads (`src/landing/demo.ts`) and links to the puzzle and the rules.
+- `rules.html`: the priority rules in plain language, by topic.
+- `design-system.html`: the design system. Tokens are in `src/design/tokens.css`, components in `src/design/system.css`.
 
 Run the tests:
 

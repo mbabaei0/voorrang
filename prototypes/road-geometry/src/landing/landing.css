@@ -1,0 +1,229 @@
+/* Landing page only. Shared pieces live in ../design/system.css. */
+
+.hero {
+  display: grid;
+  gap: var(--s-7);
+  padding-block: var(--s-6) var(--s-8);
+  align-items: center;
+}
+
+.hero-copy {
+  display: grid;
+  gap: var(--s-5);
+  align-content: center;
+}
+
+.hero-copy h1 {
+  max-width: 7ch;
+}
+
+.hero-copy .dutch {
+  font-size: var(--step-1);
+  color: var(--ink-muted);
+  font-style: italic;
+  margin-top: calc(-1 * var(--s-3));
+}
+
+.hero-copy .btn-row {
+  margin-top: var(--s-2);
+}
+
+.hero-copy .aside {
+  font-size: var(--step--1);
+  color: var(--ink-muted);
+}
+
+@media (min-width: 60rem) {
+  .hero {
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+    gap: var(--s-8);
+    padding-block: var(--s-7) var(--s-9);
+  }
+}
+
+/* ---------- The board: one playable crossroads ---------- */
+
+.board {
+  width: 100%;
+  max-width: 34rem;
+  justify-self: center;
+  border-radius: var(--r-board);
+  background: var(--board);
+  box-shadow: var(--shadow-board);
+  overflow: hidden;
+}
+
+.board-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s-4);
+  padding: var(--s-4) var(--s-5) 0;
+  color: #e8ebe7;
+}
+
+.board-head h2 {
+  font-size: var(--step-1);
+  font-weight: 700;
+}
+
+.board-head p {
+  font-size: var(--step--1);
+  color: #b5bcb7;
+}
+
+.crossroads {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.crossroads .ru {
+  cursor: pointer;
+}
+
+.crossroads .ru > g {
+  transition: transform 160ms var(--ease);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.crossroads:not(.playing) .ru:hover > g {
+  transform: scale(1.08);
+}
+
+.crossroads.playing .ru {
+  cursor: default;
+}
+
+.crossroads .badge {
+  opacity: 0;
+  transition: opacity 140ms ease;
+  pointer-events: none;
+}
+
+.crossroads .badge.shown {
+  opacity: 1;
+}
+
+.badge-diamond {
+  fill: var(--priority);
+  stroke: #ffffff;
+  stroke-width: 2.5;
+}
+
+.badge-num {
+  fill: var(--asphalt);
+  font: 800 14px var(--font);
+}
+
+.conflict {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.conflict.shown {
+  opacity: 1;
+}
+
+.conflict .pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.conflict.shown .pulse {
+  animation: pulse 1.2s var(--ease) infinite;
+}
+
+@keyframes pulse {
+  from {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
+.board-sheet {
+  display: grid;
+  gap: var(--s-4);
+  padding: var(--s-5);
+  background: var(--surface);
+}
+
+.board-sheet .prompt {
+  color: var(--ink-muted);
+}
+
+.board-sheet .tray {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.board-sheet .actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.board-sheet .actions a {
+  margin-left: auto;
+  font-weight: 600;
+}
+
+.result[hidden],
+.prompt[hidden] {
+  display: none;
+}
+
+/* ---------- Ways in ---------- */
+
+.ways {
+  padding-block: var(--s-8);
+}
+
+.ways-intro {
+  display: grid;
+  gap: var(--s-3);
+  margin-bottom: var(--s-7);
+  max-width: 40rem;
+}
+
+/* ---------- Ladder preview ---------- */
+
+.precedence {
+  display: grid;
+  gap: var(--s-6);
+  padding-block: var(--s-8) var(--s-9);
+}
+
+.precedence-intro {
+  display: grid;
+  gap: var(--s-4);
+  align-content: start;
+}
+
+.precedence-intro p {
+  color: var(--ink-muted);
+  max-width: 36ch;
+}
+
+@media (min-width: 60rem) {
+  .precedence {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: var(--s-8);
+  }
+
+  .precedence-intro {
+    align-self: start;
+    position: sticky;
+    top: var(--s-6);
+  }
+}

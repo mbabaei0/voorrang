@@ -1,0 +1,526 @@
+/*
+ * Voorrang design system: base styles and components.
+ * Tokens live in tokens.css. The design-system.html page shows every piece.
+ */
+@import './tokens.css';
+
+/* ---------- Base ---------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: var(--step-0);
+  line-height: var(--leading-text);
+  font-variation-settings: 'wdth' var(--wdth-text);
+  font-kerning: normal;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  line-height: var(--leading-heading);
+  font-weight: 750;
+  text-wrap: balance;
+}
+
+p,
+ul,
+ol {
+  margin: 0;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+a {
+  color: var(--link);
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 1px;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: var(--s-4);
+  top: -100px;
+  z-index: 10;
+  padding: var(--s-2) var(--s-4);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: var(--r-sign);
+}
+
+.skip-link:focus {
+  top: var(--s-4);
+}
+
+/* ---------- Type roles ---------- */
+
+/* Road-paint display: the narrowest, heaviest cut, like letters painted on the road. */
+.t-display {
+  font-size: var(--step-display);
+  font-weight: 860;
+  font-variation-settings: 'wdth' var(--wdth-display);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.01em;
+}
+
+.t-headline {
+  font-size: clamp(var(--step-4), 2rem + 2vw, var(--step-5));
+  font-weight: 820;
+  font-variation-settings: 'wdth' 75;
+  line-height: 1;
+}
+
+.t-title {
+  font-size: var(--step-3);
+  font-weight: 720;
+  font-variation-settings: 'wdth' 88;
+}
+
+.t-lead {
+  font-size: var(--step-2);
+  line-height: 1.45;
+  max-width: 34ch;
+}
+
+.t-small {
+  font-size: var(--step--1);
+}
+
+.t-muted {
+  color: var(--ink-muted);
+}
+
+.t-cite {
+  font-size: var(--step--1);
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Layout ---------- */
+
+.page {
+  width: min(100% - 2 * var(--gutter), var(--page));
+  margin-inline: auto;
+}
+
+.section {
+  padding-block: var(--s-8);
+}
+
+/* ---------- Site header ---------- */
+
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding-block: var(--s-5);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-3);
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 800;
+  font-size: var(--step-2);
+  font-variation-settings: 'wdth' 75;
+  letter-spacing: 0.005em;
+}
+
+.brand-mark {
+  width: 36px;
+  height: 36px;
+  flex: none;
+}
+
+.site-nav {
+  display: flex;
+  gap: var(--s-1);
+}
+
+.site-nav a {
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-sign);
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 560;
+}
+
+.site-nav a:hover {
+  background: var(--surface-sunk);
+}
+
+.site-nav a[aria-current='page'] {
+  box-shadow: inset 0 -3px 0 var(--priority);
+  border-radius: var(--r-sign) var(--r-sign) 0 0;
+}
+
+/* ---------- Sign icons ---------- */
+
+.sign {
+  width: 1.5em;
+  height: 1.5em;
+  flex: none;
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  --btn-bg: var(--surface);
+  --btn-ink: var(--ink);
+  --btn-hover: var(--surface-sunk);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-3);
+  min-height: 52px;
+  padding: var(--s-3) var(--s-5) var(--s-3) var(--s-4);
+  border: 0;
+  border-radius: var(--r-sign);
+  background: var(--btn-bg);
+  color: var(--btn-ink);
+  font: inherit;
+  font-weight: 700;
+  font-size: var(--step-1);
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 120ms ease, transform 120ms ease;
+}
+
+.btn:hover {
+  background: var(--btn-hover);
+  text-decoration: none;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.btn--action {
+  --btn-bg: var(--action);
+  --btn-ink: var(--action-ink);
+  --btn-hover: var(--action-hover);
+}
+
+.btn--guide {
+  --btn-bg: var(--guide);
+  --btn-ink: var(--guide-ink);
+  --btn-hover: var(--guide-hover);
+}
+
+.btn--quiet {
+  --btn-bg: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--line);
+  padding-inline: var(--s-4);
+}
+
+.btn--small {
+  min-height: 40px;
+  padding: var(--s-2) var(--s-4);
+  font-size: var(--step-0);
+}
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+}
+
+/* ---------- Order badge: the passing-order number on a priority diamond ---------- */
+
+.order-badge {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  color: var(--asphalt);
+  font-weight: 800;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  isolation: isolate;
+}
+
+.order-badge::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  z-index: -1;
+  transform: rotate(45deg);
+  border-radius: 3px;
+  background: var(--priority);
+  box-shadow: 0 0 0 2px var(--marking);
+}
+
+.order-badge--wrong::before {
+  background: var(--signal);
+}
+
+.order-badge--wrong {
+  color: var(--marking);
+}
+
+/* ---------- Chip: a road user in the tray ---------- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 44px;
+  padding: var(--s-1) var(--s-4) var(--s-1) var(--s-2);
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.chip:hover {
+  border-color: var(--ink-muted);
+}
+
+.chip .order-badge {
+  width: 28px;
+  height: 28px;
+}
+
+.chip-slot {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+}
+
+.chip-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1.5px rgb(0 0 0 / 0.25);
+}
+
+.chip[aria-pressed='true'] {
+  border-color: var(--priority-deep);
+}
+
+/* ---------- Feedback ---------- */
+
+.feedback {
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-sign);
+  border-left: 4px solid currentColor;
+}
+
+.feedback--good {
+  background: var(--good-bg);
+  color: var(--good);
+}
+
+.feedback--bad {
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+
+.feedback p + p,
+.feedback p + ul {
+  margin-top: var(--s-2);
+}
+
+.feedback strong {
+  font-weight: 750;
+}
+
+.feedback .explain {
+  color: var(--ink);
+}
+
+/* ---------- Haaientanden: the one divider. It means "give way to what follows". ---------- */
+
+.teeth {
+  height: 14px;
+  background: var(--ink);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='14'%3E%3Cpath d='M3 0h16l-8 14z'/%3E%3C/svg%3E") space no-repeat left center / 28px 14px;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='14'%3E%3Cpath d='M3 0h16l-8 14z'/%3E%3C/svg%3E") space no-repeat left center / 28px 14px;
+  opacity: 0.85;
+}
+
+/* ---------- Lanes: two columns split by a dashed centre line ---------- */
+
+.lanes {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--s-7);
+}
+
+.lane {
+  display: grid;
+  align-content: start;
+  gap: var(--s-4);
+  max-width: 34rem;
+}
+
+.lane > .sign {
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--s-2);
+}
+
+.lane p {
+  color: var(--ink-muted);
+}
+
+.lane-line {
+  height: 3px;
+  background: repeating-linear-gradient(90deg, var(--line) 0 28px, transparent 28px 48px);
+}
+
+@media (min-width: 52rem) {
+  .lanes {
+    grid-template-columns: 1fr 3px 1fr;
+    gap: clamp(var(--s-6), 5vw, var(--s-8));
+  }
+
+  .lane-line {
+    width: 3px;
+    height: auto;
+    background: repeating-linear-gradient(180deg, var(--line) 0 28px, transparent 28px 48px);
+  }
+}
+
+/* ---------- Ladder: the precedence ranking (a real order, so it is numbered) ---------- */
+
+.ladder {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0;
+  counter-reset: rung;
+}
+
+.ladder li {
+  counter-increment: rung;
+  display: grid;
+  grid-template-columns: 3.5rem 1fr;
+  column-gap: var(--s-4);
+  row-gap: var(--s-1);
+  padding-block: var(--s-4);
+  border-top: 1.5px solid var(--line);
+}
+
+.ladder li:last-child {
+  border-bottom: 1.5px solid var(--line);
+}
+
+.ladder li::before {
+  content: counter(rung);
+  grid-row: span 3;
+  font-size: var(--step-5);
+  font-weight: 860;
+  font-variation-settings: 'wdth' var(--wdth-display);
+  line-height: 0.9;
+  color: var(--ink);
+}
+
+.ladder li:first-child::before {
+  color: var(--priority-deep);
+}
+
+.ladder h3 {
+  font-size: var(--step-2);
+  font-weight: 720;
+}
+
+.ladder p {
+  color: var(--ink-muted);
+  max-width: 52ch;
+}
+
+/* ---------- Site footer ---------- */
+
+.site-footer {
+  padding-block: var(--s-6) var(--s-7);
+  color: var(--ink-muted);
+  font-size: var(--step--1);
+}
+
+.site-footer .page {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--s-4);
+}
+
+.site-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4);
+}
+
+.site-footer a {
+  color: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+  }
+}
