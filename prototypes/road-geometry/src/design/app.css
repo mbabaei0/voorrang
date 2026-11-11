@@ -137,6 +137,58 @@ body.app .site-header {
   color: var(--bg);
 }
 
+/* Tool buttons carry an icon; the text label drops away on phones. */
+.tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+}
+
+.tool-icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+@media (max-width: 39.99rem) {
+  .stage-tools {
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    bottom: var(--s-3);
+  }
+
+  .stage-tools .select {
+    flex: 1 1 auto;
+    min-width: 0;
+    text-overflow: ellipsis;
+  }
+
+  .stage-tools .tool-label {
+    display: none;
+  }
+
+  .stage-tools .tool {
+    min-width: 40px;
+    padding-inline: 0;
+  }
+
+  .stage-tools .segmented .tool {
+    min-width: 34px;
+  }
+
+  /* The settings popover drops below the toolbar row instead of joining it. */
+  .stage-tools .panel {
+    position: absolute;
+    top: calc(40px + var(--s-2));
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-width: none;
+    max-height: none;
+  }
+}
+
 .toggle {
   display: inline-flex;
   align-items: center;

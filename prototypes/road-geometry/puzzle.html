@@ -18,6 +18,18 @@
         <rect width="36" height="36" rx="7" style="fill: var(--ink)" />
         <path d="M5 12h7.3l-3.65 10zM14.35 12h7.3L18 22zM23.7 12H31l-3.65 10z" style="fill: var(--bg)" />
       </symbol>
+      <symbol id="i-top" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="14" height="14" rx="2" /><path d="M10 3v14M3 10h14" />
+      </symbol>
+      <symbol id="i-angled" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 5h8l4 10H2z" /><path d="M10 5v10M4 10h12" />
+      </symbol>
+      <symbol id="i-you" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1.5 10S4.5 4.5 10 4.5 18.5 10 18.5 10 15.5 15.5 10 15.5 1.5 10 1.5 10z" /><circle cx="10" cy="10" r="2.5" />
+      </symbol>
+      <symbol id="i-settings" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M3 5h8M15 5h2M3 10h2M9 10h8M3 15h10M17 15h0" /><circle cx="13" cy="5" r="2" /><circle cx="7" cy="10" r="2" /><circle cx="15" cy="15" r="2" />
+      </symbol>
     </svg>
 
     <header class="site-header" style="padding-inline: var(--gutter)">
@@ -38,11 +50,11 @@
         <div id="top" class="stage-tools">
           <select id="scenario" class="select" aria-label="Scenario"></select>
           <div class="segmented" role="group" aria-label="Camera">
-            <button id="cam-overhead" class="tool" type="button" data-camera="overhead">Top</button>
-            <button id="cam-angled" class="tool" type="button" data-camera="angled">Angled</button>
-            <button id="cam-you" class="tool" type="button" data-camera="you">You</button>
+            <button id="cam-overhead" class="tool" type="button" data-camera="overhead" aria-label="Top view" title="Top view"><svg class="tool-icon" aria-hidden="true"><use href="#i-top" /></svg><span class="tool-label">Top</span></button>
+            <button id="cam-angled" class="tool" type="button" data-camera="angled" aria-label="Angled view" title="Angled view"><svg class="tool-icon" aria-hidden="true"><use href="#i-angled" /></svg><span class="tool-label">Angled</span></button>
+            <button id="cam-you" class="tool" type="button" data-camera="you" aria-label="You view" title="You view"><svg class="tool-icon" aria-hidden="true"><use href="#i-you" /></svg><span class="tool-label">You</span></button>
           </div>
-          <button id="open-settings" class="tool" type="button" aria-expanded="false" aria-controls="settings">Settings</button>
+          <button id="open-settings" class="tool" type="button" aria-expanded="false" aria-controls="settings" aria-label="Settings" title="Settings"><svg class="tool-icon" aria-hidden="true"><use href="#i-settings" /></svg><span class="tool-label">Settings</span></button>
           <form id="settings" class="panel" hidden>
             <fieldset>
               <legend>Choose the order by</legend>
